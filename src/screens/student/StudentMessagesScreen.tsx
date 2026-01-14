@@ -14,6 +14,8 @@ import { useAuth } from '../../context/AuthContext';
 import { messageService } from '../../services/messageService';
 import { userService } from '../../services/userService';
 import { Message, PersonUser } from '../../types';
+import PageHeader from '../../components/PageHeader';
+import { theme } from '../../config/theme';
 
 export default function StudentMessagesScreen() {
   const { user } = useAuth();
@@ -82,116 +84,146 @@ export default function StudentMessagesScreen() {
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="large" color="#F59E0B" />
+      <View style={{ flex: 1, backgroundColor: theme.background.primary }}>
+        <PageHeader icon="chatbubbles-outline" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={theme.primary.main} />
+        </View>
       </View>
     );
   }
 
   if (!professor) {
     return (
-      <View className="flex-1 items-center justify-center p-6">
-        <Text className="text-6xl mb-4">👨‍🏫</Text>
-        <Text className="text-xl font-bold text-gray-800 mb-2">
-          No tienes profesor asignado
-        </Text>
-        <Text className="text-gray-500 text-center">
-          Tu gimnasio te asignará un profesor pronto
-        </Text>
+      <View style={{ flex: 1, backgroundColor: theme.background.primary }}>
+        <PageHeader icon="chatbubbles-outline" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: theme.spacing.xl }}>
+          <Text style={{ fontSize: 48, marginBottom: theme.spacing.lg }}>👨‍🏫</Text>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: theme.text.primary, marginBottom: theme.spacing.sm }}>
+            No tienes profesor asignado
+          </Text>
+          <Text style={{ color: theme.text.secondary, textAlign: 'center' }}>
+            Tu gimnasio te asignará un profesor pronto
+          </Text>
+        </View>
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1"
-    >
-      <View className="flex-1 bg-gray-50">
-        {/* Header del profesor */}
-        <View className="bg-white px-4 py-3 border-b border-gray-200">
-          <Text className="text-lg font-bold text-gray-800">
-            {professor.displayName}
-          </Text>
-          <Text className="text-gray-500 text-sm">{professor.email}</Text>
-        </View>
-
-        {/* Mensajes */}
-        <ScrollView className="flex-1 px-4 py-4">
-          {messages.length === 0 ? (
-            <View className="items-center py-8">
-              <Text className="text-gray-500">
-                No hay mensajes aún. ¡Envía el primero!
-              </Text>
-            </View>
-          ) : (
-            messages.map((message) => {
-              const isMe = message.fromUserId === user?.id;
-              return (
-                <View
-                  key={message.id}
-                  className={`mb-3 ${isMe ? 'items-end' : 'items-start'}`}
-                >
+    <View style={{ flex: 1, backgroundColor: theme.background.primary }}>
+      <PageHeader icon="chatbubbles-outline" />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <View style={{ flex: 1 }}>
+          {/* Mensajes */}
+          <ScrollView contentContainerStyle={{ padding: theme.spacing.xl }}>
+            {messages.length === 0 ? (
+              <View style={{ alignItems: 'center', paddingVertical: theme.spacing.xxxl }}>
+                <Text style={{ color: theme.text.secondary }}>
+                  No hay mensajes aún. ¡Envía el primero!
+                </Text>
+              </View>
+            ) : (
+              messages.map((message) => {
+                const isMe = message.fromUserId === user?.id;
+                return (
                   <View
-                    className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                      isMe
-                        ? 'bg-amber-600 rounded-br-sm'
-                        : 'bg-white rounded-bl-sm border border-gray-200'
-                    }`}
+                    key={message.id}
+                    style={{
+                      marginBottom: theme.spacing.md,
+                      alignItems: isMe ? 'flex-end' : 'flex-start',
+                    }}
                   >
-                    <Text
-                      className={`${
-                        isMe ? 'text-white' : 'text-gray-800'
-                      } text-base`}
+                    <View
+                      style={{
+                        maxWidth: '80%',
+                        borderRadius: theme.borderRadius.xl,
+                        paddingHorizontal: theme.spacing.lg,
+                        paddingVertical: theme.spacing.md,
+                        backgroundColor: isMe ? theme.primary.main : theme.background.secondary,
+                        borderWidth: isMe ? 0 : 1,
+                        borderColor: theme.background.tertiary,
+                      }}
                     >
-                      {message.message}
-                    </Text>
-                    <Text
-                      className={`text-xs mt-1 ${
-                        isMe ? 'text-amber-100' : 'text-gray-500'
-                      }`}
-                    >
-                      {new Date(message.createdAt).toLocaleTimeString('es-ES', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </Text>
+                      <Text
+                        style={{
+                          color: isMe ? theme.text.white : theme.text.primary,
+                          fontSize: 15,
+                        }}
+                      >
+                        {message.message}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          marginTop: 4,
+                          color: isMe ? theme.text.whiteAlpha[90] : theme.text.tertiary,
+                        }}
+                      >
+                        {new Date(message.createdAt).toLocaleTimeString('es-ES', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              );
-            })
-          )}
-        </ScrollView>
+                );
+              })
+            )}
+          </ScrollView>
 
-        {/* Input de mensaje */}
-        <View className="bg-white border-t border-gray-200 px-4 py-3">
-          <View className="flex-row items-center gap-2">
-            <TextInput
-              value={messageText}
-              onChangeText={setMessageText}
-              placeholder="Escribe un mensaje..."
-              placeholderTextColor="#9CA3AF"
-              className="flex-1 bg-gray-100 rounded-xl px-4 py-3 text-gray-800"
-              multiline
-              maxLength={500}
-              autoComplete="off"
-              textContentType="none"
-            />
-            <TouchableOpacity
-              onPress={handleSendMessage}
-              disabled={!messageText.trim() || sending}
-              className="bg-amber-600 rounded-xl px-6 py-3"
-              activeOpacity={0.8}
-            >
-              {sending ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text className="text-white font-bold">Enviar</Text>
-              )}
-            </TouchableOpacity>
+          {/* Input de mensaje */}
+          <View style={{
+            backgroundColor: theme.background.secondary,
+            borderTopWidth: 1,
+            borderTopColor: theme.background.tertiary,
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.md,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+              <TextInput
+                value={messageText}
+                onChangeText={setMessageText}
+                placeholder="Escribe un mensaje..."
+                placeholderTextColor={theme.text.tertiary}
+                style={{
+                  flex: 1,
+                  backgroundColor: theme.background.tertiary,
+                  borderRadius: theme.borderRadius.lg,
+                  paddingHorizontal: theme.spacing.lg,
+                  paddingVertical: theme.spacing.md,
+                  color: theme.text.primary,
+                  fontSize: 15,
+                }}
+                multiline
+                maxLength={500}
+                autoComplete="off"
+                textContentType="none"
+              />
+              <TouchableOpacity
+                onPress={handleSendMessage}
+                disabled={!messageText.trim() || sending}
+                style={{
+                  backgroundColor: theme.primary.main,
+                  borderRadius: theme.borderRadius.lg,
+                  paddingHorizontal: theme.spacing.xxxl,
+                  paddingVertical: theme.spacing.md,
+                }}
+                activeOpacity={0.8}
+              >
+                {sending ? (
+                  <ActivityIndicator color={theme.text.white} size="small" />
+                ) : (
+                  <Text style={{ color: theme.text.white, fontWeight: '700' }}>Enviar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }

@@ -11,6 +11,8 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { requestService } from '../../services/requestService';
 import { GymRequest } from '../../types';
+import PageHeader from '../../components/PageHeader';
+import { theme } from '../../config/theme';
 
 interface StudentRequestsScreenProps {
   onRequestUpdate?: () => void;
@@ -95,8 +97,11 @@ export default function StudentRequestsScreen({ onRequestUpdate }: StudentReques
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="large" color="#F59E0B" />
+      <View style={{ flex: 1, backgroundColor: theme.background.primary }}>
+        <PageHeader icon="document-text-outline" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={theme.primary.main} />
+        </View>
       </View>
     );
   }
@@ -104,38 +109,49 @@ export default function StudentRequestsScreen({ onRequestUpdate }: StudentReques
   const pendingRequests = requests.filter((r) => r.status === 'pending');
 
   return (
-    <ScrollView className="flex-1 bg-gray-50">
-      <View className="p-4">
+    <View style={{ flex: 1, backgroundColor: theme.background.primary }}>
+      <PageHeader icon="document-text-outline" />
+      <ScrollView contentContainerStyle={{ padding: theme.spacing.xl }}>
         {/* Filtros */}
-        <View className="flex-row gap-2 mb-4">
+        <View style={{ flexDirection: 'row', gap: theme.spacing.sm, marginBottom: theme.spacing.lg }}>
           <TouchableOpacity
             onPress={() => setFilter('pending')}
-            className={`flex-1 py-3 rounded-xl items-center ${
-              filter === 'pending'
-                ? 'bg-amber-600'
-                : 'bg-white border border-gray-200'
-            }`}
+            style={{
+              flex: 1,
+              paddingVertical: 12,
+              borderRadius: theme.borderRadius.lg,
+              alignItems: 'center',
+              backgroundColor: filter === 'pending' ? theme.primary.main : theme.background.secondary,
+              borderWidth: filter === 'pending' ? 0 : 1,
+              borderColor: theme.background.tertiary,
+            }}
           >
             <Text
-              className={`font-semibold ${
-                filter === 'pending' ? 'text-white' : 'text-gray-700'
-              }`}
+              style={{
+                fontWeight: '600',
+                color: filter === 'pending' ? theme.text.white : theme.text.primary,
+              }}
             >
               Pendientes ({pendingRequests.length})
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setFilter('all')}
-            className={`flex-1 py-3 rounded-xl items-center ${
-              filter === 'all'
-                ? 'bg-amber-600'
-                : 'bg-white border border-gray-200'
-            }`}
+            style={{
+              flex: 1,
+              paddingVertical: 12,
+              borderRadius: theme.borderRadius.lg,
+              alignItems: 'center',
+              backgroundColor: filter === 'all' ? theme.primary.main : theme.background.secondary,
+              borderWidth: filter === 'all' ? 0 : 1,
+              borderColor: theme.background.tertiary,
+            }}
           >
             <Text
-              className={`font-semibold ${
-                filter === 'all' ? 'text-white' : 'text-gray-700'
-              }`}
+              style={{
+                fontWeight: '600',
+                color: filter === 'all' ? theme.text.white : theme.text.primary,
+              }}
             >
               Todas
             </Text>
@@ -144,88 +160,163 @@ export default function StudentRequestsScreen({ onRequestUpdate }: StudentReques
 
         {/* Lista de solicitudes */}
         {requests.length === 0 ? (
-          <View className="bg-white rounded-2xl p-8 items-center">
-            <Text className="text-6xl mb-4">📬</Text>
-            <Text className="text-xl font-bold text-gray-800 mb-2">
+          <View style={{
+            backgroundColor: theme.background.secondary,
+            borderRadius: theme.borderRadius.xl,
+            padding: theme.spacing.xxxl * 2,
+            alignItems: 'center',
+            shadowColor: theme.shadow.color,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 8,
+            elevation: 2,
+          }}>
+            <Text style={{ fontSize: 48, marginBottom: theme.spacing.lg }}>📬</Text>
+            <Text style={{
+              fontSize: 20,
+              fontWeight: '700',
+              color: theme.text.primary,
+              marginBottom: theme.spacing.sm,
+            }}>
               No hay solicitudes
             </Text>
-            <Text className="text-gray-500 text-center">
+            <Text style={{
+              color: theme.text.secondary,
+              textAlign: 'center',
+            }}>
               {filter === 'pending'
                 ? 'No tienes solicitudes pendientes'
                 : 'No tienes solicitudes'}
             </Text>
           </View>
         ) : (
-          requests.map((request) => (
-            <View
-              key={request.id}
-              className="bg-white rounded-2xl p-4 mb-4 shadow-sm"
-            >
-              <View className="flex-row items-start justify-between mb-3">
-                <View className="flex-1">
-                  <Text className="text-lg font-bold text-gray-800 mb-1">
-                    Solicitud de {request.requestedRole === 'professor' ? 'Profesor' : 'Alumno'}
-                  </Text>
-                  <Text className="text-gray-600 text-sm">
-                    {request.requestType === 'gym_to_person'
-                      ? 'Gimnasio te invita'
-                      : 'Solicitud enviada'}
-                  </Text>
-                  {request.message && (
-                    <Text className="text-gray-500 text-sm mt-2">
-                      {request.message}
+          requests.map((request) => {
+            const statusConfig = getStatusConfig(request.status);
+            return (
+              <View
+                key={request.id}
+                style={{
+                  backgroundColor: theme.background.secondary,
+                  borderRadius: theme.borderRadius.xl,
+                  padding: theme.spacing.lg,
+                  marginBottom: theme.spacing.lg,
+                  shadowColor: theme.shadow.color,
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 8,
+                  elevation: 2,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: theme.spacing.md }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{
+                      fontSize: 18,
+                      fontWeight: '700',
+                      color: theme.text.primary,
+                      marginBottom: 4,
+                    }}>
+                      Solicitud de {request.requestedRole === 'professor' ? 'Profesor' : 'Alumno'}
                     </Text>
-                  )}
+                    <Text style={{
+                      color: theme.text.secondary,
+                      fontSize: 14,
+                    }}>
+                      {request.requestType === 'gym_to_person'
+                        ? 'Gimnasio te invita'
+                        : 'Solicitud enviada'}
+                    </Text>
+                    {request.message && (
+                      <Text style={{
+                        color: theme.text.tertiary,
+                        fontSize: 14,
+                        marginTop: theme.spacing.sm,
+                      }}>
+                        {request.message}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 4,
+                    borderRadius: theme.borderRadius.xl,
+                    backgroundColor: statusConfig.bgColor,
+                  }}>
+                    <Text style={{
+                      fontSize: 11,
+                      fontWeight: '700',
+                      color: statusConfig.color,
+                    }}>
+                      {statusConfig.text}
+                    </Text>
+                  </View>
                 </View>
-                <View
-                  className={`px-3 py-1 rounded-full ${
-                    request.status === 'pending'
-                      ? 'bg-yellow-100'
-                      : request.status === 'accepted'
-                      ? 'bg-green-100'
-                      : 'bg-red-100'
-                  }`}
-                >
-                  <Text
-                    className={`text-xs font-semibold ${
-                      request.status === 'pending'
-                        ? 'text-yellow-700'
-                        : request.status === 'accepted'
-                        ? 'text-green-700'
-                        : 'text-red-700'
-                    }`}
-                  >
-                    {request.status === 'pending'
-                      ? 'Pendiente'
-                      : request.status === 'accepted'
-                      ? 'Aceptada'
-                      : 'Rechazada'}
-                  </Text>
-                </View>
-              </View>
 
-              {request.status === 'pending' && (
-                <View className="flex-row gap-2 mt-2">
-                  <TouchableOpacity
-                    onPress={() => handleAccept(request)}
-                    className="flex-1 bg-green-600 rounded-xl py-3 items-center"
-                    activeOpacity={0.8}
-                  >
-                    <Text className="text-white font-semibold">Aceptar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleReject(request)}
-                    className="flex-1 bg-red-600 rounded-xl py-3 items-center"
-                    activeOpacity={0.8}
-                  >
-                    <Text className="text-white font-semibold">Rechazar</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          ))
+                {request.status === 'pending' && (
+                  <View style={{ flexDirection: 'row', gap: theme.spacing.sm, marginTop: theme.spacing.sm }}>
+                    <TouchableOpacity
+                      onPress={() => handleAccept(request)}
+                      style={{
+                        flex: 1,
+                        backgroundColor: theme.accent.success,
+                        borderRadius: theme.borderRadius.lg,
+                        paddingVertical: 12,
+                        alignItems: 'center',
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={{ color: theme.text.white, fontWeight: '600' }}>Aceptar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleReject(request)}
+                      style={{
+                        flex: 1,
+                        backgroundColor: theme.background.tertiary,
+                        borderRadius: theme.borderRadius.lg,
+                        paddingVertical: 12,
+                        alignItems: 'center',
+                        borderWidth: 2,
+                        borderColor: theme.text.secondary,
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={{ color: theme.text.secondary, fontWeight: '600' }}>Rechazar</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            );
+          })
         )}
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
+
+const getStatusConfig = (status: string) => {
+  switch (status) {
+    case 'pending':
+      return {
+        color: theme.accent.warning,
+        bgColor: theme.iconBackground.lighter,
+        text: 'Pendiente',
+      };
+    case 'accepted':
+      return {
+        color: theme.accent.success,
+        bgColor: theme.iconBackground.light,
+        text: 'Aceptada',
+      };
+    case 'rejected':
+      return {
+        color: theme.text.secondary,
+        bgColor: theme.background.tertiary,
+        text: 'Rechazada',
+      };
+    default:
+      return {
+        color: theme.text.secondary,
+        bgColor: theme.background.tertiary,
+        text: status,
+      };
+  }
+};

@@ -14,14 +14,12 @@ export default function StudentMessagesStack() {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerShown: true,
-        header: () => <PageHeader icon="chatbubbles-outline" />,
+        headerShown: false,
       }}
     >
       <Stack.Screen
         name="StudentMessagesHome"
         component={StudentMessagesScreen}
-        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );

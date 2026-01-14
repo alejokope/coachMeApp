@@ -20,6 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../config/theme';
 import LoadingScreen from '../../components/LoadingScreen';
+import PageHeader from '../../components/PageHeader';
 
 export default function PersonConfigScreen() {
   const { user } = useAuth();
@@ -115,8 +116,8 @@ export default function PersonConfigScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background.primary }}>
+      <PageHeader icon="settings-outline" />
       <ScrollView
-        style={{ flex: 1 }}
         contentContainerStyle={{ padding: theme.spacing.xl }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary.main} />

@@ -60,7 +60,8 @@ export default function PageHeader({
     loadGymName();
   }, [user?.id, (user as any)?.gymId]);
 
-  const displayTitle = title || user?.displayName || 'Mi Perfil';
+  // Asegurar que siempre tengamos un título
+  const displayTitle = title || user?.displayName || user?.email || 'Mi Perfil';
   
   // Mostrar nombre del gimnasio si existe, sino "Sin gimnasio"
   let displaySubtitle = subtitle;
@@ -69,15 +70,14 @@ export default function PageHeader({
       displaySubtitle = 'Cargando...';
     } else if (gymName) {
       displaySubtitle = gymName;
-    } else if ((user as any)?.gymId) {
-      displaySubtitle = 'Sin gimnasio';
     } else {
+      // Siempre mostrar "Sin gimnasio" si no hay gym asociado
       displaySubtitle = 'Sin gimnasio';
     }
   }
 
   return (
-    <>
+    <View>
       <StatusBar barStyle="light-content" backgroundColor={theme.primary.dark} />
       <LinearGradient
         colors={theme.gradients.header}
@@ -141,6 +141,6 @@ export default function PageHeader({
           )}
         </View>
       </LinearGradient>
-    </>
+    </View>
   );
 }

@@ -1,6 +1,6 @@
-// Pantalla de rutinas del alumno - Mejorada y profesional
+// Pantalla de rutinas del alumno - Unificada con rutinas propias y asignadas
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { routineService } from '../../services/routineService';
@@ -8,10 +8,13 @@ import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import LoadingScreen from '../../components/LoadingScreen';
+import PageHeader from '../../components/PageHeader';
+import { theme } from '../../config/theme';
 
 type StudentRoutinesStackParamList = {
   StudentRoutinesHome: undefined;
-  Workout: { routineId: string };
+  Workout: { routineId: string; isPersonal?: boolean };
+  CreateRoutine: undefined;
 };
 
 type StudentNavigationProp = NativeStackNavigationProp<
@@ -19,10 +22,19 @@ type StudentNavigationProp = NativeStackNavigationProp<
   'StudentRoutinesHome'
 >;
 
+interface RoutineItem {
+  id: string;
+  name: string;
+  description?: string;
+  days: any[];
+  status?: 'active' | 'completed' | 'paused';
+  isPersonal: boolean;
+}
+
 export default function StudentRoutinesScreen() {
   const navigation = useNavigation<StudentNavigationProp>();
   const { user } = useAuth();
-  const [routines, setRoutines] = useState<any[]>([]);
+  const [routines, setRoutines] = useState<RoutineItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,13 +43,33 @@ export default function StudentRoutinesScreen() {
       loadRoutines();
     });
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, user]);
 
   const loadRoutines = async () => {
     try {
       setLoading(true);
-      const data = await routineService.getStudentRoutines(user?.id || '');
-      setRoutines(data);
+      if (!user?.id) return;
+
+      // Cargar rutinas asignadas
+      const assignedRoutines = await routineService.getStudentRoutines(user.id);
+      
+      // Cargar rutinas propias (donde professorId = userId y no tiene gymId)
+      const personalRoutines = await routineService.getProfessorRoutines(user.id);
+      const personalOnly = personalRoutines
+        .filter((r) => !r.gymId)
+        .map((r) => ({
+          ...r,
+          isPersonal: true,
+          status: 'active' as const,
+        }));
+
+      // Combinar y marcar rutinas asignadas
+      const allRoutines: RoutineItem[] = [
+        ...assignedRoutines.map((r) => ({ ...r, isPersonal: false })),
+        ...personalOnly,
+      ];
+
+      setRoutines(allRoutines);
     } catch (error) {
       console.error('Error loading routines:', error);
     } finally {
@@ -45,124 +77,232 @@ export default function StudentRoutinesScreen() {
     }
   };
 
+  const handleStartWorkout = (routine: RoutineItem) => {
+    navigation.navigate('Workout', {
+      routineId: routine.id,
+      isPersonal: routine.isPersonal,
+    });
+  };
+
   if (loading) {
-    return <LoadingScreen message="Cargando rutinas..." color="#F59E0B" icon="fitness-outline" />;
+    return <LoadingScreen message="Cargando rutinas..." color={theme.primary.main} icon="fitness-outline" />;
   }
 
   return (
-    <ScrollView className="flex-1 bg-gray-50">
-      {/* Header mejorado */}
-      <LinearGradient
-        colors={['#F59E0B', '#D97706', '#B45309']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        className="px-6 pt-6 pb-8"
-      >
-        <Text className="text-3xl font-bold text-white mb-2">
-          Mis Rutinas
-        </Text>
-        <Text className="text-amber-100 text-base">
-          {routines.length} {routines.length === 1 ? 'rutina activa' : 'rutinas activas'}
-        </Text>
-      </LinearGradient>
+    <View style={{ flex: 1, backgroundColor: theme.background.primary }}>
+      <PageHeader icon="fitness-outline" />
+      <ScrollView contentContainerStyle={{ padding: theme.spacing.xl }}>
+        {/* Botón para crear rutina propia */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate('CreateRoutine' as any)}
+          style={[
+            styles.createButton,
+            {
+              backgroundColor: theme.background.secondary,
+              borderRadius: theme.borderRadius.xl,
+              padding: theme.spacing.xl,
+              marginBottom: theme.spacing.xl,
+              shadowColor: theme.shadow.secondary,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.2,
+              shadowRadius: 12,
+              elevation: 5,
+            }
+          ]}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={theme.gradients.primary}
+            style={{
+              borderRadius: theme.borderRadius.xl,
+              width: 48,
+              height: 48,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: theme.spacing.lg,
+            }}
+          >
+            <Ionicons name="add" size={28} color={theme.text.white} />
+          </LinearGradient>
+          <Text style={{ color: theme.primary.main, fontWeight: '700', fontSize: 18 }}>Crear Nueva Rutina</Text>
+        </TouchableOpacity>
 
-      <View className="px-6 py-6">
         {routines.length === 0 ? (
-          <View className="bg-white rounded-3xl p-12 items-center shadow-sm">
+          <View style={{
+            backgroundColor: theme.background.secondary,
+            borderRadius: theme.borderRadius.xl,
+            padding: theme.spacing.xxxl * 1.5,
+            alignItems: 'center',
+            shadowColor: theme.shadow.color,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 8,
+            elevation: 2,
+          }}>
             <LinearGradient
-              colors={['#F59E0B', '#D97706']}
-              className="rounded-full w-24 h-24 items-center justify-center mb-6"
+              colors={theme.gradients.primary}
+              style={{
+                borderRadius: theme.borderRadius.xl * 1.2,
+                width: 96,
+                height: 96,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: theme.spacing.xl,
+              }}
             >
-              <Ionicons name="fitness-outline" size={48} color="white" />
+              <Ionicons name="fitness-outline" size={48} color={theme.text.white} />
             </LinearGradient>
-            <Text className="text-2xl font-bold text-gray-800 mb-2">
-              No tienes rutinas asignadas
+            <Text style={{
+              fontSize: 22,
+              fontWeight: '700',
+              color: theme.text.primary,
+              marginBottom: 8,
+            }}>
+              No tienes rutinas
             </Text>
-            <Text className="text-gray-500 text-center">
-              Tu profesor te asignará una rutina pronto
+            <Text style={{
+              color: theme.text.secondary,
+              textAlign: 'center',
+              marginBottom: theme.spacing.xl,
+            }}>
+              Crea tu primera rutina o espera a que tu profesor te asigne una
             </Text>
           </View>
         ) : (
           routines.map((routine) => (
             <View
               key={routine.id}
-              className="bg-white rounded-3xl p-6 mb-4 shadow-lg"
               style={{
-                shadowColor: '#000',
+                backgroundColor: theme.background.secondary,
+                borderRadius: theme.borderRadius.xl,
+                padding: theme.spacing.xl,
+                marginBottom: theme.spacing.lg,
+                shadowColor: theme.shadow.color,
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: 0.1,
                 shadowRadius: 12,
                 elevation: 5,
               }}
             >
-              <View className="flex-row items-start justify-between mb-3">
-                <View className="flex-1">
-                  <Text className="text-xl font-bold text-gray-800 mb-1">
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{
+                    fontSize: 20,
+                    fontWeight: '700',
+                    color: theme.text.primary,
+                    marginBottom: 4,
+                  }}>
                     {routine.name}
                   </Text>
                   {routine.description && (
-                    <Text className="text-gray-600 text-sm mb-3" numberOfLines={2}>
+                    <Text style={{
+                      color: theme.text.secondary,
+                      fontSize: 14,
+                      marginBottom: 12,
+                    }} numberOfLines={2}>
                       {routine.description}
                     </Text>
                   )}
-                  <View className="flex-row items-center flex-wrap">
-                    <View className="bg-amber-100 rounded-full px-3 py-1 mr-2 mb-2">
-                      <Text className="text-amber-700 text-xs font-semibold">
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <View style={{
+                      backgroundColor: theme.iconBackground.light,
+                      borderRadius: theme.borderRadius.xl,
+                      paddingHorizontal: 12,
+                      paddingVertical: 4,
+                      marginRight: 8,
+                    }}>
+                      <Text style={{
+                        color: theme.accent.success,
+                        fontSize: 11,
+                        fontWeight: '700',
+                      }}>
                         {routine.days.length} {routine.days.length === 1 ? 'día' : 'días'}
                       </Text>
                     </View>
-                    <View
-                      className={`rounded-full px-3 py-1 mb-2 ${
-                        routine.status === 'active'
-                          ? 'bg-green-100'
-                          : routine.status === 'completed'
-                          ? 'bg-blue-100'
-                          : 'bg-gray-100'
-                      }`}
-                    >
-                      <Text
-                        className={`text-xs font-semibold ${
-                          routine.status === 'active'
-                            ? 'text-green-700'
-                            : routine.status === 'completed'
-                            ? 'text-blue-700'
-                            : 'text-gray-700'
-                        }`}
-                      >
-                        {routine.status === 'active'
-                          ? 'Activa'
-                          : routine.status === 'completed'
-                          ? 'Completada'
-                          : 'Pausada'}
+                    <View style={{
+                      backgroundColor: routine.isPersonal ? theme.iconBackground.tertiary : theme.iconBackground.light,
+                      borderRadius: theme.borderRadius.xl,
+                      paddingHorizontal: 12,
+                      paddingVertical: 4,
+                      marginRight: 8,
+                    }}>
+                      <Text style={{
+                        color: routine.isPersonal ? theme.primary.main : theme.accent.info,
+                        fontSize: 11,
+                        fontWeight: '700',
+                      }}>
+                        {routine.isPersonal ? 'Personal' : 'Asignada'}
                       </Text>
                     </View>
+                    {routine.status && (
+                      <View style={{
+                        backgroundColor: routine.status === 'active'
+                          ? theme.iconBackground.light
+                          : routine.status === 'completed'
+                          ? theme.iconBackground.secondary
+                          : theme.iconBackground.tertiary,
+                        borderRadius: theme.borderRadius.xl,
+                        paddingHorizontal: 12,
+                        paddingVertical: 4,
+                      }}>
+                        <Text style={{
+                          color: routine.status === 'active'
+                            ? theme.accent.success
+                            : routine.status === 'completed'
+                            ? theme.accent.info
+                            : theme.text.tertiary,
+                          fontSize: 11,
+                          fontWeight: '700',
+                        }}>
+                          {routine.status === 'active'
+                            ? 'Activa'
+                            : routine.status === 'completed'
+                            ? 'Completada'
+                            : 'Pausada'}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 </View>
               </View>
               
               <TouchableOpacity
-                onPress={() => navigation.navigate('Workout', { 
-                  routineId: routine.id
-                })}
-                className="bg-gradient-to-r from-amber-600 to-orange-600 rounded-xl py-4 items-center mt-3"
+                onPress={() => handleStartWorkout(routine)}
                 activeOpacity={0.8}
-                style={{
-                  shadowColor: '#F59E0B',
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 8,
-                  elevation: 5,
-                }}
               >
-                <View className="flex-row items-center">
-                  <Ionicons name="play-circle" size={24} color="white" style={{ marginRight: 8 }} />
-                  <Text className="text-white font-bold text-lg">Iniciar Entrenamiento</Text>
-                </View>
+                <LinearGradient
+                  colors={theme.gradients.primary}
+                  style={{
+                    borderRadius: theme.borderRadius.lg,
+                    paddingVertical: theme.spacing.lg,
+                    paddingHorizontal: theme.spacing.xl,
+                    alignItems: 'center',
+                    marginTop: theme.spacing.md,
+                    shadowColor: theme.primary.main,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 8,
+                    elevation: 5,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Ionicons name="play-circle" size={24} color={theme.text.white} style={{ marginRight: 8 }} />
+                    <Text style={{ color: theme.text.white, fontWeight: '700', fontSize: 16 }}>Iniciar Entrenamiento</Text>
+                  </View>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           ))
         )}
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  createButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

@@ -16,19 +16,18 @@ export default function StudentProfileStack() {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerShown: true,
-        header: () => <PageHeader icon="person-outline" />,
+        headerShown: false,
       }}
     >
       <Stack.Screen
         name="StudentProfileHome"
         component={StudentProfileScreen}
-        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="PersonalMax"
         component={PersonalMaxScreen}
         options={{ 
+          headerShown: true,
           header: () => <PageHeader title="Máximos Personales" icon="fitness-outline" />,
         }}
       />

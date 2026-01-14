@@ -6,6 +6,7 @@ import { GymUser } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import { requestService } from '../services/requestService';
 import { theme } from '../config/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Screens
 import SystemAdminScreen from '../screens/admin/SystemAdminScreen';
@@ -55,6 +56,7 @@ import GymHeader from '../components/GymHeader';
 
 export default function MainTabs() {
   const { user, isSystemAdmin, loading } = useAuth();
+  const insets = useSafeAreaInsets();
   const [studentPendingRequestsCount, setStudentPendingRequestsCount] = useState(0);
   const [gymPendingRequestsCount, setGymPendingRequestsCount] = useState(0);
   const [personPendingRequestsCount, setPersonPendingRequestsCount] = useState(0);
@@ -139,9 +141,9 @@ export default function MainTabs() {
           tabBarStyle: {
             backgroundColor: '#FFFFFF',
             borderTopWidth: 0,
-            paddingBottom: 8,
+            paddingBottom: Math.max(insets.bottom, 8),
             paddingTop: 8,
-            height: 70,
+            height: 70 + Math.max(insets.bottom - 8, 0),
             shadowColor: '#000',
             shadowOffset: { width: 0, height: -2 },
             shadowOpacity: 0.06,
@@ -267,8 +269,8 @@ export default function MainTabs() {
         <Tab.Navigator
           screenOptions={{
             headerShown: false,
-            tabBarActiveTintColor: '#F59E0B',
-            tabBarInactiveTintColor: '#9CA3AF',
+            tabBarActiveTintColor: theme.primary.main,
+            tabBarInactiveTintColor: theme.text.tertiary,
             tabBarLabelStyle: {
               fontSize: 11,
               fontWeight: '600',
@@ -278,9 +280,9 @@ export default function MainTabs() {
             tabBarStyle: {
               backgroundColor: theme.background.secondary,
               borderTopWidth: 0,
-              paddingBottom: 8,
+              paddingBottom: Math.max(insets.bottom, 8),
               paddingTop: 8,
-              height: 70,
+              height: 70 + Math.max(insets.bottom - 8, 0),
               shadowColor: theme.shadow.color,
               shadowOffset: { width: 0, height: -2 },
               shadowOpacity: 0.06,
@@ -371,8 +373,7 @@ export default function MainTabs() {
     return (
       <Tab.Navigator
         screenOptions={{
-          headerShown: true,
-          header: () => <PageHeader icon="person-outline" />,
+          headerShown: false,
           tabBarActiveTintColor: theme.primary.main,
           tabBarInactiveTintColor: theme.text.tertiary,
           tabBarLabelStyle: {

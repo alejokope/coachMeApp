@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import LoadingScreen from '../../components/LoadingScreen';
 import { theme } from '../../config/theme';
+import PageHeader from '../../components/PageHeader';
 
 type PersonRoutinesStackParamList = {
   PersonRoutinesHome: undefined;
@@ -55,10 +56,11 @@ export default function PersonRoutinesScreen() {
   }
 
   return (
-    <ScrollView 
-      style={{ flex: 1, backgroundColor: theme.background.primary }}
-      contentContainerStyle={{ padding: theme.spacing.xl }}
-    >
+    <View style={{ flex: 1, backgroundColor: theme.background.primary }}>
+      <PageHeader icon="fitness-outline" />
+      <ScrollView 
+        contentContainerStyle={{ padding: theme.spacing.xl }}
+      >
       <TouchableOpacity
         onPress={() => navigation.navigate('CreateRoutine' as any)}
         style={[
@@ -219,6 +221,7 @@ export default function PersonRoutinesScreen() {
         ))
       )}
     </ScrollView>
+    </View>
   );
 }
 

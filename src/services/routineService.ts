@@ -15,6 +15,38 @@ import {
 import { db } from './firebase';
 import { Routine } from '../types';
 
+// Función auxiliar para limpiar undefined de objetos anidados
+const cleanUndefined = (obj: any): any => {
+  if (obj === undefined) {
+    return null; // Convertir undefined a null para Firestore
+  }
+  
+  if (obj === null) {
+    return null;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(cleanUndefined).filter(item => item !== undefined && item !== null);
+  }
+  
+  if (typeof obj === 'object' && obj.constructor === Object) {
+    const cleaned: any = {};
+    Object.keys(obj).forEach((key) => {
+      const value = obj[key];
+      if (value !== undefined) {
+        const cleanedValue = cleanUndefined(value);
+        // Solo agregar si el valor limpio no es undefined
+        if (cleanedValue !== undefined) {
+          cleaned[key] = cleanedValue;
+        }
+      }
+    });
+    return cleaned;
+  }
+  
+  return obj;
+};
+
 export const routineService = {
   // Obtener todas las rutinas de un profesor (o persona)
   async getProfessorRoutines(professorId: string): Promise<Routine[]> {
@@ -76,11 +108,43 @@ export const routineService = {
   ): Promise<Routine> {
     try {
       const routinesRef = collection(db, 'routines');
-      const docRef = await addDoc(routinesRef, {
-        ...routine,
+      
+      // Limpiar todos los undefined recursivamente
+      const cleanedRoutine = cleanUndefined(routine);
+      
+      // Eliminar campos que no pertenecen a Routine
+      const { userType, ...routineWithoutExtraFields } = cleanedRoutine;
+      
+      // Verificar que no haya undefined en el objeto final
+      const checkForUndefined = (obj: any, path = ''): void => {
+        if (obj === undefined) {
+          console.error(`Found undefined at path: ${path}`);
+          throw new Error(`Undefined value found at ${path}`);
+        }
+        if (Array.isArray(obj)) {
+          obj.forEach((item, index) => checkForUndefined(item, `${path}[${index}]`));
+        } else if (typeof obj === 'object' && obj !== null) {
+          Object.keys(obj).forEach((key) => {
+            checkForUndefined(obj[key], path ? `${path}.${key}` : key);
+          });
+        }
+      };
+      
+      checkForUndefined(routineWithoutExtraFields);
+      
+      const routineData: any = {
+        ...routineWithoutExtraFields,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+      };
+      
+      // Log temporal para debugging - mostrar solo las claves principales
+      console.log('Creating routine - keys:', Object.keys(routineData));
+      console.log('Creating routine - has gymId:', 'gymId' in routineData, routineData.gymId);
+      console.log('Creating routine - has description:', 'description' in routineData, routineData.description);
+      console.log('Creating routine - days count:', routineData.days?.length);
+      
+      const docRef = await addDoc(routinesRef, routineData);
       
       const docSnap = await getDoc(docRef);
       return {

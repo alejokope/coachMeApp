@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../config/theme';
 import LoadingScreen from '../../components/LoadingScreen';
+import PageHeader from '../../components/PageHeader';
 
 export default function PersonRequestsScreen() {
   const { user, refreshUserData } = useAuth();
@@ -107,13 +108,14 @@ export default function PersonRequestsScreen() {
   const pendingRequests = requests.filter((r) => r.status === 'pending');
 
   return (
-    <ScrollView 
-      style={{ flex: 1, backgroundColor: theme.background.primary }}
-      contentContainerStyle={{ padding: theme.spacing.xl }}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.primary.main} />
-      }
-    >
+    <View style={{ flex: 1, backgroundColor: theme.background.primary }}>
+      <PageHeader icon="document-text-outline" />
+      <ScrollView 
+        contentContainerStyle={{ padding: theme.spacing.xl }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.primary.main} />
+        }
+      >
       {/* Debug Info */}
       {__DEV__ && user && (
         <View style={{
@@ -318,6 +320,7 @@ export default function PersonRequestsScreen() {
         })
       )}
     </ScrollView>
+    </View>
   );
 }
 

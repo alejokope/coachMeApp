@@ -12,6 +12,8 @@ import { userService } from '../../services/userService';
 import { PersonUser } from '../../types';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import PageHeader from '../../components/PageHeader';
+import { theme } from '../../config/theme';
 
 type StudentStackParamList = {
   StudentHome: undefined;
@@ -51,65 +53,144 @@ export default function StudentProfileScreen() {
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="large" color="#F59E0B" />
+      <View style={{ flex: 1, backgroundColor: theme.background.primary }}>
+        <PageHeader icon="person-outline" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={theme.primary.main} />
+        </View>
       </View>
     );
   }
 
   return (
-    <ScrollView className="flex-1 px-6 py-4">
-      {/* Información del profesor */}
-      {professor ? (
-        <View className="bg-white rounded-2xl p-6 mb-4 shadow-sm">
-          <Text className="text-xl font-bold text-gray-800 mb-4">
-            Mi Profesor
-          </Text>
-          <View className="items-center mb-4">
-            <View className="bg-amber-100 rounded-full w-20 h-20 items-center justify-center mb-3">
-              <Text className="text-4xl">👨‍🏫</Text>
-            </View>
-            <Text className="text-lg font-bold text-gray-800">
-              {professor.displayName}
+    <View style={{ flex: 1, backgroundColor: theme.background.primary }}>
+      <PageHeader icon="person-outline" />
+      <ScrollView contentContainerStyle={{ padding: theme.spacing.xl }}>
+        {/* Información del profesor */}
+        {professor ? (
+          <View style={{
+            backgroundColor: theme.background.secondary,
+            borderRadius: theme.borderRadius.xl,
+            padding: theme.spacing.xl,
+            marginBottom: theme.spacing.lg,
+            shadowColor: theme.shadow.color,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 8,
+            elevation: 2,
+          }}>
+            <Text style={{
+              fontSize: 20,
+              fontWeight: '700',
+              color: theme.text.primary,
+              marginBottom: theme.spacing.lg,
+            }}>
+              Mi Profesor
             </Text>
-            <Text className="text-gray-500 text-sm">{professor.email}</Text>
+            <View style={{ alignItems: 'center', marginBottom: theme.spacing.lg }}>
+              <View style={{
+                backgroundColor: theme.iconBackground.tertiary,
+                borderRadius: theme.borderRadius.xl * 1.2,
+                width: 80,
+                height: 80,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: theme.spacing.md,
+              }}>
+                <Text style={{ fontSize: 40 }}>👨‍🏫</Text>
+              </View>
+              <Text style={{
+                fontSize: 18,
+                fontWeight: '700',
+                color: theme.text.primary,
+              }}>
+                {professor.displayName}
+              </Text>
+              <Text style={{
+                color: theme.text.secondary,
+                fontSize: 14,
+              }}>{professor.email}</Text>
+            </View>
           </View>
-        </View>
-      ) : (
-        <View className="bg-white rounded-2xl p-8 items-center mb-4">
-          <Text className="text-6xl mb-4">👨‍🏫</Text>
-          <Text className="text-xl font-bold text-gray-800 mb-2">
-            No tienes profesor asignado
-          </Text>
-          <Text className="text-gray-500 text-center">
-            Tu gimnasio te asignará un profesor pronto
-          </Text>
-        </View>
-      )}
+        ) : (
+          <View style={{
+            backgroundColor: theme.background.secondary,
+            borderRadius: theme.borderRadius.xl,
+            padding: theme.spacing.xxxl * 2,
+            alignItems: 'center',
+            marginBottom: theme.spacing.lg,
+            shadowColor: theme.shadow.color,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 8,
+            elevation: 2,
+          }}>
+            <Text style={{ fontSize: 48, marginBottom: theme.spacing.lg }}>👨‍🏫</Text>
+            <Text style={{
+              fontSize: 20,
+              fontWeight: '700',
+              color: theme.text.primary,
+              marginBottom: theme.spacing.sm,
+            }}>
+              No tienes profesor asignado
+            </Text>
+            <Text style={{
+              color: theme.text.secondary,
+              textAlign: 'center',
+            }}>
+              Tu gimnasio te asignará un profesor pronto
+            </Text>
+          </View>
+        )}
 
-      {/* Máximos personales */}
-      <TouchableOpacity
-        onPress={() => navigation.navigate('PersonalMax')}
-        className="bg-white rounded-2xl p-6 shadow-sm"
-        activeOpacity={0.7}
-      >
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center">
-            <View className="bg-blue-100 rounded-full w-12 h-12 items-center justify-center mr-4">
-              <Text className="text-2xl">💪</Text>
+        {/* Máximos personales */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate('PersonalMax')}
+          style={{
+            backgroundColor: theme.background.secondary,
+            borderRadius: theme.borderRadius.xl,
+            padding: theme.spacing.xl,
+            shadowColor: theme.shadow.color,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 8,
+            elevation: 2,
+          }}
+          activeOpacity={0.7}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{
+                backgroundColor: theme.iconBackground.quaternary,
+                borderRadius: theme.borderRadius.xl * 1.2,
+                width: 48,
+                height: 48,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: theme.spacing.lg,
+              }}>
+                <Text style={{ fontSize: 24 }}>💪</Text>
+              </View>
+              <View>
+                <Text style={{
+                  fontSize: 18,
+                  fontWeight: '700',
+                  color: theme.text.primary,
+                }}>
+                  Mis Máximos Personales
+                </Text>
+                <Text style={{
+                  color: theme.text.secondary,
+                  fontSize: 14,
+                }}>
+                  Gestiona tus récords
+                </Text>
+              </View>
             </View>
-            <View>
-              <Text className="text-lg font-bold text-gray-800">
-                Mis Máximos Personales
-              </Text>
-              <Text className="text-gray-500 text-sm">
-                Gestiona tus récords
-              </Text>
-            </View>
+            <Text style={{ color: theme.text.tertiary, fontSize: 20 }}>›</Text>
           </View>
-          <Text className="text-gray-400 text-xl">›</Text>
-        </View>
-      </TouchableOpacity>
-    </ScrollView>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
   );
 }

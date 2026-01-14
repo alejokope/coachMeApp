@@ -19,13 +19,11 @@ export default function StudentRequestsStack({ onRequestUpdate }: { onRequestUpd
   return (
     <Stack.Navigator
       screenOptions={{
-        headerShown: true,
-        header: () => <PageHeader icon="document-text-outline" />,
+        headerShown: false,
       }}
     >
       <Stack.Screen
         name="StudentRequestsHome"
-        options={{ headerShown: false }}
       >
         {() => <StudentRequestsScreenWrapper onRequestUpdate={onRequestUpdate} />}
       </Stack.Screen>

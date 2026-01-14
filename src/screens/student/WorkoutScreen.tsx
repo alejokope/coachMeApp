@@ -1,4 +1,4 @@
-// Modo entrenamiento mejorado - Elegir día y ejercicio, contador con notificaciones
+// Modo entrenamiento mejorado - Paso a paso con checks, temporizador y registro de pesos
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -7,22 +7,30 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
-  Alert,
   AppState,
   AppStateStatus,
   ActivityIndicator,
+  StyleSheet,
+  Animated,
 } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Notifications from 'expo-notifications';
-import { Routine, RoutineExercise, ExerciseSet } from '../../types';
+import { Routine, RoutineExercise, ExerciseSet, WorkoutSetRecord, WorkoutExerciseRecord } from '../../types';
 import { routineService } from '../../services/routineService';
-import { commentService } from '../../services/commentService';
+import { personalMaxService } from '../../services/personalMaxService';
+import { workoutHistoryService } from '../../services/workoutHistoryService';
 import { useAuth } from '../../context/AuthContext';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { theme } from '../../config/theme';
+import Toast from '../../components/Toast';
+import Loading from '../../components/Loading';
+import LoadingScreen from '../../components/LoadingScreen';
 
 type StudentStackParamList = {
   StudentHome: undefined;
-  Workout: { routineId: string };
+  Workout: { routineId: string; isPersonal?: boolean };
 };
 
 type WorkoutScreenRouteProp = RouteProp<StudentStackParamList, 'Workout'>;
@@ -31,7 +39,7 @@ type WorkoutScreenNavigationProp = NativeStackNavigationProp<
   'Workout'
 >;
 
-// Configurar notificaciones (solo locales, no push remotas)
+// Configurar notificaciones
 try {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -41,28 +49,50 @@ try {
     }),
   });
 } catch (error) {
-  // Ignorar error en Expo Go - las notificaciones locales seguirán funcionando
-  console.log('Notification handler configurado (notificaciones locales disponibles)');
+  console.log('Notification handler configurado');
 }
 
 export default function WorkoutScreen() {
   const route = useRoute<WorkoutScreenRouteProp>();
   const navigation = useNavigation<WorkoutScreenNavigationProp>();
   const { user } = useAuth();
-  const { routineId } = route.params;
+  const { routineId, isPersonal } = route.params;
 
+  // Estados principales
   const [routine, setRoutine] = useState<any>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [selectedExercise, setSelectedExercise] = useState<RoutineExercise | null>(null);
   const [currentSetIndex, setCurrentSetIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [loadingMax, setLoadingMax] = useState(false);
+  
+  // Temporizador
   const [restTime, setRestTime] = useState(0);
   const [isResting, setIsResting] = useState(false);
-  const [comment, setComment] = useState('');
-  const [commentModalVisible, setCommentModalVisible] = useState(false);
-  const [loading, setLoading] = useState(true);
-
   const restTimerRef = useRef<NodeJS.Timeout | null>(null);
   const notificationIdRef = useRef<string | null>(null);
+  
+  // Peso máximo y datos del ejercicio
+  const [personalMax, setPersonalMax] = useState<number | null>(null);
+  const [weightUsed, setWeightUsed] = useState<string>('');
+  const [weightModalVisible, setWeightModalVisible] = useState(false);
+  
+  // Historial de entrenamiento
+  const [workoutSession, setWorkoutSession] = useState<string | null>(null);
+  const [completedExercises, setCompletedExercises] = useState<Set<string>>(new Set());
+  const [exerciseRecords, setExerciseRecords] = useState<Map<string, WorkoutExerciseRecord>>(new Map());
+  
+  // Toast
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type?: 'success' | 'error' | 'info' }>({
+    visible: false,
+    message: '',
+    type: 'info',
+  });
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ visible: true, message, type });
+  };
 
   useEffect(() => {
     loadRoutine();
@@ -79,29 +109,29 @@ export default function WorkoutScreen() {
         try {
           Notifications.cancelScheduledNotificationAsync(notificationIdRef.current);
         } catch (error) {
-          // Ignorar error en Expo Go
+          // Ignorar error
         }
       }
     };
   }, []);
 
+  useEffect(() => {
+    if (selectedExercise?.exerciseId && user?.id) {
+      loadPersonalMax();
+    }
+  }, [selectedExercise?.exerciseId, user?.id]);
+
   const requestNotificationPermissions = async () => {
     try {
       const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') {
-        // Solo mostrar alerta si realmente falla, no si es un error de Expo Go
-        console.log('Permisos de notificaciones:', status);
-      }
+      console.log('Permisos de notificaciones:', status);
     } catch (error) {
-      // En Expo Go, las notificaciones push remotas no están disponibles
-      // pero las notificaciones locales pueden seguir funcionando
-      console.log('Notificaciones locales disponibles (push remotas no disponibles en Expo Go)');
+      console.log('Notificaciones locales disponibles');
     }
   };
 
   const handleAppStateChange = (nextAppState: AppStateStatus) => {
     if (nextAppState === 'background' && isResting) {
-      // Programar notificación cuando la app se minimiza durante descanso
       scheduleRestNotification();
     }
   };
@@ -121,9 +151,7 @@ export default function WorkoutScreen() {
         });
         notificationIdRef.current = notificationId;
       } catch (error) {
-        // Las notificaciones locales pueden no funcionar en Expo Go
-        // El contador seguirá funcionando en la app
-        console.log('Notificación local no disponible (funciona en development build)');
+        console.log('Notificación local no disponible');
       }
     }
   };
@@ -131,61 +159,163 @@ export default function WorkoutScreen() {
   const loadRoutine = async () => {
     try {
       setLoading(true);
-      const found = await routineService.getAssignedRoutineById(routineId);
+      let found = null;
+      
+      if (isPersonal) {
+        found = await routineService.getRoutineById(routineId);
+      } else {
+        found = await routineService.getAssignedRoutineById(routineId);
+      }
+      
       if (found) {
         setRoutine(found);
+      } else {
+        showToast('No se pudo cargar la rutina', 'error');
       }
     } catch (error) {
-      Alert.alert('Error', 'No se pudo cargar la rutina');
+      console.error('Error loading routine:', error);
+      showToast('Error al cargar la rutina', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const startWorkout = (dayNumber: number) => {
-    setSelectedDay(dayNumber);
+  const loadPersonalMax = async () => {
+    if (!selectedExercise?.exerciseId || !user?.id) return;
+    
+    try {
+      setLoadingMax(true);
+      const max = await personalMaxService.getExerciseMax(user.id, selectedExercise.exerciseId);
+      setPersonalMax(max?.maxWeight || null);
+    } catch (error) {
+      console.error('Error loading personal max:', error);
+    } finally {
+      setLoadingMax(false);
+    }
+  };
+
+  const startWorkout = async (dayNumber: number) => {
+    if (!routine || !user || saving) return;
+    
+    try {
+      setSaving(true);
+      // Crear sesión de entrenamiento
+      const currentDay = routine.days.find((d: any) => d.dayNumber === dayNumber);
+      if (!currentDay) {
+        setSaving(false);
+        return;
+      }
+
+      const session = await workoutHistoryService.createWorkoutSession({
+        userId: user.id,
+        routineId: routine.id,
+        routineName: routine.name,
+        dayNumber: dayNumber,
+        dayName: currentDay.name,
+        exercises: [],
+        completed: false,
+      });
+      
+      setWorkoutSession(session.id);
+      setSelectedDay(dayNumber);
+      showToast('¡Entrenamiento iniciado!', 'success');
+    } catch (error) {
+      console.error('Error starting workout:', error);
+      showToast('Error al iniciar entrenamiento', 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const selectExercise = (exercise: RoutineExercise) => {
     setSelectedExercise(exercise);
     setCurrentSetIndex(0);
+    setWeightUsed('');
   };
 
-  const startSet = () => {
-    if (!selectedExercise) return;
-    // El usuario indica que empezó la serie
-    // No hacemos nada aquí, solo cuando completa
+  const calculateWeightFromPercentage = (percentage?: number): number | null => {
+    if (!percentage || !personalMax) return null;
+    return Math.round((personalMax * percentage) / 100);
+  };
+
+  const getCurrentSet = (): ExerciseSet | null => {
+    if (!selectedExercise) return null;
+    return selectedExercise.sets[currentSetIndex] || null;
   };
 
   const completeSet = async () => {
-    if (!selectedExercise) return;
+    if (!selectedExercise || !getCurrentSet() || !user || saving) return;
 
-    const set = selectedExercise.sets[currentSetIndex];
-    if (!set) return;
+    try {
+      setSaving(true);
+      const set = getCurrentSet()!;
+      const finalWeight = weightUsed ? parseFloat(weightUsed) : (set.weight || calculateWeightFromPercentage(set.loadPercentage) || 0);
 
-    // Marcar serie como completada
-    const nextSetIndex = currentSetIndex + 1;
-    
-    if (nextSetIndex < selectedExercise.sets.length) {
-      // Hay más series, iniciar descanso
-      const restSeconds = set.restTime || 60; // Default 60 segundos
-      startRest(restSeconds);
-      setCurrentSetIndex(nextSetIndex);
-    } else {
-      // Terminó todas las series del ejercicio
-      Alert.alert(
-        '¡Ejercicio completado!',
-        `Has terminado todas las series de ${selectedExercise.exercise?.name || 'este ejercicio'}`,
-        [
-          {
-            text: 'Continuar',
-            onPress: () => {
-              setSelectedExercise(null);
-              setCurrentSetIndex(0);
-            },
-          },
-        ]
-      );
+      // Registrar serie completada
+      const exerciseId = selectedExercise.exerciseId;
+      const existingRecord = exerciseRecords.get(exerciseId);
+      
+      const setRecord: WorkoutSetRecord = {
+        setId: set.id,
+        exerciseId: exerciseId,
+        repetitions: set.repetitions,
+        weight: finalWeight,
+        completed: true,
+        completedAt: new Date(),
+      };
+
+      const updatedRecord: WorkoutExerciseRecord = existingRecord || {
+        exerciseId: exerciseId,
+        exerciseName: selectedExercise.exercise?.name || 'Ejercicio',
+        sets: [],
+        completed: false,
+      };
+
+      updatedRecord.sets.push(setRecord);
+      setExerciseRecords(new Map(exerciseRecords.set(exerciseId, updatedRecord)));
+
+      // Limpiar peso usado
+      setWeightUsed('');
+
+      const nextSetIndex = currentSetIndex + 1;
+      
+      if (nextSetIndex < selectedExercise.sets.length) {
+        // Hay más series, iniciar descanso
+        const restSeconds = set.restTime || 60;
+        startRest(restSeconds);
+        setCurrentSetIndex(nextSetIndex);
+        showToast(`Serie ${currentSetIndex + 1} completada`, 'success');
+      } else {
+        // Terminó todas las series del ejercicio
+        updatedRecord.completed = true;
+        updatedRecord.completedAt = new Date();
+        setExerciseRecords(new Map(exerciseRecords.set(exerciseId, updatedRecord)));
+        setCompletedExercises(new Set(completedExercises).add(exerciseId));
+        
+        showToast(`¡${selectedExercise.exercise?.name || 'Ejercicio'} completado!`, 'success');
+        
+        // Actualizar sesión de entrenamiento
+        if (workoutSession) {
+          const allRecords = Array.from(exerciseRecords.values());
+          allRecords.push(updatedRecord);
+          
+          try {
+            await workoutHistoryService.updateWorkoutSession(workoutSession, {
+              exercises: allRecords,
+            });
+          } catch (error) {
+            console.error('Error updating workout session:', error);
+          }
+        }
+        
+        // Volver a selección de ejercicios
+        setTimeout(() => {
+          setSelectedExercise(null);
+          setCurrentSetIndex(0);
+        }, 1500);
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -193,25 +323,21 @@ export default function WorkoutScreen() {
     setRestTime(seconds);
     setIsResting(true);
 
-    // Cancelar notificación anterior si existe
     if (notificationIdRef.current) {
       try {
         Notifications.cancelScheduledNotificationAsync(notificationIdRef.current);
       } catch (error) {
-        // Ignorar error en Expo Go
+        // Ignorar
       }
     }
 
-    // Programar notificación
     scheduleRestNotification();
 
-    // Iniciar contador
     restTimerRef.current = setInterval(() => {
       setRestTime((prev) => {
         if (prev <= 1) {
           clearInterval(restTimerRef.current!);
           setIsResting(false);
-          // Enviar notificación inmediata
           try {
             Notifications.scheduleNotificationAsync({
               content: {
@@ -219,11 +345,12 @@ export default function WorkoutScreen() {
                 body: 'Ya puedes continuar con tu siguiente serie',
                 sound: true,
               },
-              trigger: null, // Inmediato
+              trigger: null,
             });
           } catch (error) {
-            // Ignorar error en Expo Go - el contador seguirá funcionando
+            // Ignorar
           }
+          showToast('¡Descanso terminado!', 'success');
           return 0;
         }
         return prev - 1;
@@ -239,11 +366,12 @@ export default function WorkoutScreen() {
       try {
         Notifications.cancelScheduledNotificationAsync(notificationIdRef.current);
       } catch (error) {
-        // Ignorar error en Expo Go
+        // Ignorar
       }
     }
     setIsResting(false);
     setRestTime(0);
+    showToast('Descanso saltado', 'info');
   };
 
   const formatTime = (seconds: number) => {
@@ -252,36 +380,38 @@ export default function WorkoutScreen() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const addComment = async () => {
-    if (!comment.trim() || !selectedExercise || !user) return;
+  const finishWorkout = async () => {
+    if (!workoutSession || saving) return;
 
     try {
-      await commentService.createComment({
-        routineId,
-        exerciseId: selectedExercise.exerciseId,
-        userId: user.id,
-        comment: comment.trim(),
+      setSaving(true);
+      const allRecords = Array.from(exerciseRecords.values());
+      await workoutHistoryService.updateWorkoutSession(workoutSession, {
+        exercises: allRecords,
+        completed: true,
+        endTime: new Date(),
       });
-      Alert.alert('Éxito', 'Comentario agregado');
-      setComment('');
-      setCommentModalVisible(false);
+      
+      showToast('¡Entrenamiento completado!', 'success');
+      setTimeout(() => {
+        navigation.goBack();
+      }, 1500);
     } catch (error) {
-      Alert.alert('Error', 'No se pudo agregar el comentario');
+      console.error('Error finishing workout:', error);
+      showToast('Error al finalizar entrenamiento', 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
   if (loading) {
-    return (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="large" color="#F59E0B" />
-      </View>
-    );
+    return <LoadingScreen message="Cargando rutina..." color={theme.primary.main} icon="fitness-outline" />;
   }
 
   if (!routine) {
     return (
-      <View className="flex-1 items-center justify-center p-6">
-        <Text className="text-gray-500">No se pudo cargar la rutina</Text>
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>No se pudo cargar la rutina</Text>
       </View>
     );
   }
@@ -289,252 +419,640 @@ export default function WorkoutScreen() {
   // Pantalla 1: Seleccionar día
   if (!selectedDay) {
     return (
-      <ScrollView className="flex-1 bg-gray-50">
-        <View className="p-6">
-          <Text className="text-2xl font-bold text-gray-800 mb-2">
-            Seleccionar Día
-          </Text>
-          <Text className="text-gray-600 mb-6">
-            Elige el día de la rutina que vas a entrenar
-          </Text>
+      <View style={styles.container}>
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.sectionTitle}>Selecciona el día</Text>
+          <Text style={styles.sectionSubtitle}>Elige el día de la rutina que vas a entrenar</Text>
 
           {routine.days.map((day: any) => (
             <TouchableOpacity
               key={day.dayNumber}
               onPress={() => startWorkout(day.dayNumber)}
-              className="bg-white rounded-2xl p-6 mb-4 shadow-sm"
+              style={styles.dayCard}
               activeOpacity={0.7}
+              disabled={saving}
             >
-              <Text className="text-xl font-bold text-gray-800 mb-1">
-                Día {day.dayNumber}
-                {day.name && ` - ${day.name}`}
-              </Text>
-              <Text className="text-gray-600">
-                {day.exercises.length} {day.exercises.length === 1 ? 'ejercicio' : 'ejercicios'}
-              </Text>
+              <View style={styles.dayCardContent}>
+                <View style={styles.dayCardHeader}>
+                  <Text style={styles.dayCardNumber}>Día {day.dayNumber}</Text>
+                  {day.name && <Text style={styles.dayCardName}>{day.name}</Text>}
+                </View>
+                <Text style={styles.dayCardExercises}>
+                  {day.exercises.length} ejercicio{day.exercises.length !== 1 ? 's' : ''}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color={theme.text.tertiary} />
             </TouchableOpacity>
           ))}
-        </View>
-      </ScrollView>
+        </ScrollView>
+        <Toast
+          visible={toast.visible}
+          message={toast.message}
+          type={toast.type}
+          onHide={() => setToast({ ...toast, visible: false })}
+        />
+      </View>
     );
   }
 
   const currentDay = routine.days.find((d: any) => d.dayNumber === selectedDay);
 
-  // Pantalla 2: Seleccionar ejercicio (si no hay uno seleccionado)
+  // Pantalla 2: Seleccionar ejercicio
   if (!selectedExercise) {
+    const allExercisesCompleted = currentDay?.exercises.every((ex: RoutineExercise) =>
+      completedExercises.has(ex.exerciseId)
+    );
+
     return (
-      <ScrollView className="flex-1 bg-gray-50">
-        <View className="p-6">
-          <View className="flex-row items-center justify-between mb-6">
-            <View>
-              <Text className="text-2xl font-bold text-gray-800">
-                Día {selectedDay}
-              </Text>
-              <Text className="text-gray-600">
-                Elige el ejercicio que vas a realizar
-              </Text>
-            </View>
+      <View style={styles.container}>
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.dayInfo}>
+            <Text style={styles.dayInfoTitle}>{currentDay?.name || `Día ${selectedDay}`}</Text>
             <TouchableOpacity
               onPress={() => setSelectedDay(null)}
-              className="bg-gray-200 rounded-xl px-4 py-2"
+              style={styles.changeDayButton}
             >
-              <Text className="text-gray-700 font-semibold">Cambiar Día</Text>
+              <Text style={styles.changeDayButtonText}>Cambiar Día</Text>
             </TouchableOpacity>
           </View>
 
-          {currentDay?.exercises.map((exercise: RoutineExercise, index: number) => (
+          {currentDay?.exercises.map((exercise: RoutineExercise, index: number) => {
+            const isCompleted = completedExercises.has(exercise.exerciseId);
+            return (
+              <TouchableOpacity
+                key={exercise.id || index}
+                onPress={() => selectExercise(exercise)}
+                style={[styles.exerciseCard, isCompleted && styles.exerciseCardCompleted]}
+                activeOpacity={0.7}
+              >
+                <View style={styles.exerciseCardContent}>
+                  <View style={styles.exerciseCardHeader}>
+                    <Text style={styles.exerciseCardName}>
+                      {exercise.exercise?.name || `Ejercicio ${index + 1}`}
+                    </Text>
+                    {isCompleted && (
+                      <View style={styles.checkBadge}>
+                        <Ionicons name="checkmark-circle" size={24} color={theme.accent.success} />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.exerciseCardSets}>
+                    {exercise.sets.length} serie{exercise.sets.length !== 1 ? 's' : ''}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color={theme.text.tertiary} />
+              </TouchableOpacity>
+            );
+          })}
+
+          {allExercisesCompleted && (
             <TouchableOpacity
-              key={exercise.id || index}
-              onPress={() => selectExercise(exercise)}
-              className="bg-white rounded-2xl p-6 mb-4 shadow-sm"
-              activeOpacity={0.7}
+              onPress={finishWorkout}
+              style={styles.finishButton}
+              activeOpacity={0.8}
+              disabled={saving}
             >
-              <Text className="text-xl font-bold text-gray-800 mb-2">
-                {exercise.exercise?.name || `Ejercicio ${index + 1}`}
-              </Text>
-              <Text className="text-gray-600">
-                {exercise.sets.length} {exercise.sets.length === 1 ? 'serie' : 'series'}
-              </Text>
+              <LinearGradient
+                colors={theme.gradients.primary}
+                style={styles.finishButtonGradient}
+              >
+                <Ionicons name="checkmark-circle" size={24} color={theme.text.white} />
+                <Text style={styles.finishButtonText}>Finalizar Entrenamiento</Text>
+              </LinearGradient>
             </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
+          )}
+        </ScrollView>
+        <Toast
+          visible={toast.visible}
+          message={toast.message}
+          type={toast.type}
+          onHide={() => setToast({ ...toast, visible: false })}
+        />
+      </View>
     );
   }
 
   // Pantalla 3: Modo entrenamiento activo
-  const currentSet = selectedExercise.sets[currentSetIndex];
+  const currentSet = getCurrentSet();
+  if (!currentSet) return null;
+
+  const plannedWeight = currentSet.weight || calculateWeightFromPercentage(currentSet.loadPercentage);
+  const displayWeight = weightUsed || plannedWeight?.toString() || '0';
 
   return (
-    <View className="flex-1 bg-gray-50">
-      {/* Header */}
-      <View className="bg-amber-600 px-6 py-4">
-        <View className="flex-row items-center justify-between">
-          <View>
-            <Text className="text-white font-bold text-lg">
-              {selectedExercise.exercise?.name || 'Ejercicio'}
-            </Text>
-            <Text className="text-amber-100 text-sm">
+    <View style={styles.container}>
+      
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* Info de la serie */}
+        <View style={styles.setInfoCard}>
+          <View style={styles.setInfoHeader}>
+            <Text style={styles.setInfoTitle}>
               Serie {currentSetIndex + 1} de {selectedExercise.sets.length}
             </Text>
+            <View style={styles.progressBar}>
+              <View
+                style={[
+                  styles.progressFill,
+                  { width: `${((currentSetIndex + 1) / selectedExercise.sets.length) * 100}%` },
+                ]}
+              />
+            </View>
           </View>
-          <TouchableOpacity
-            onPress={() => {
-              Alert.alert(
-                'Finalizar Ejercicio',
-                '¿Quieres cambiar de ejercicio?',
-                [
-                  { text: 'Cancelar', style: 'cancel' },
-                  {
-                    text: 'Cambiar',
-                    onPress: () => {
-                      setSelectedExercise(null);
-                      setCurrentSetIndex(0);
-                      setIsResting(false);
-                      setRestTime(0);
-                      if (restTimerRef.current) {
-                        clearInterval(restTimerRef.current);
-                      }
-                    },
-                  },
-                ]
-              );
-            }}
-            className="bg-white/20 rounded-xl px-4 py-2"
-          >
-            <Text className="text-white font-semibold">Cambiar</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
 
-      <ScrollView className="flex-1 px-6 py-4">
-        {/* Información de la serie actual */}
-        <View className="bg-white rounded-2xl p-6 mb-4 shadow-sm">
-          <Text className="text-lg font-bold text-gray-800 mb-4">
-            Serie {currentSetIndex + 1}
-          </Text>
-          
-          <View className="space-y-3">
+          <View style={styles.setInfoGrid}>
             {currentSet.repetitions && (
-              <View className="flex-row justify-between">
-                <Text className="text-gray-600">Repeticiones:</Text>
-                <Text className="font-semibold text-gray-800">
-                  {currentSet.repetitions}
-                </Text>
+              <View style={styles.setInfoItem}>
+                <Text style={styles.setInfoLabel}>Repeticiones</Text>
+                <Text style={styles.setInfoValue}>{currentSet.repetitions}</Text>
               </View>
             )}
-            {currentSet.weight && (
-              <View className="flex-row justify-between">
-                <Text className="text-gray-600">Peso:</Text>
-                <Text className="font-semibold text-gray-800">
-                  {currentSet.weight} kg
-                </Text>
+            
+            {plannedWeight && (
+              <View style={styles.setInfoItem}>
+                <Text style={styles.setInfoLabel}>Peso Planificado</Text>
+                <Text style={styles.setInfoValue}>{plannedWeight} kg</Text>
               </View>
             )}
+            
             {currentSet.loadPercentage && (
-              <View className="flex-row justify-between">
-                <Text className="text-gray-600">% Carga:</Text>
-                <Text className="font-semibold text-gray-800">
-                  {currentSet.loadPercentage}%
-                </Text>
+              <View style={styles.setInfoItem}>
+                <Text style={styles.setInfoLabel}>% de Carga</Text>
+                <Text style={styles.setInfoValue}>{currentSet.loadPercentage}%</Text>
               </View>
             )}
+            
+            {personalMax && (
+              <View style={styles.setInfoItem}>
+                <Text style={styles.setInfoLabel}>Peso Máximo</Text>
+                <Text style={styles.setInfoValue}>{personalMax} kg</Text>
+              </View>
+            )}
+            
             {currentSet.rir !== undefined && (
-              <View className="flex-row justify-between">
-                <Text className="text-gray-600">RIR:</Text>
-                <Text className="font-semibold text-gray-800">
-                  {currentSet.rir}
-                </Text>
+              <View style={styles.setInfoItem}>
+                <Text style={styles.setInfoLabel}>RIR</Text>
+                <Text style={styles.setInfoValue}>{currentSet.rir}</Text>
+              </View>
+            )}
+            
+            {currentSet.restTime && (
+              <View style={styles.setInfoItem}>
+                <Text style={styles.setInfoLabel}>Descanso</Text>
+                <Text style={styles.setInfoValue}>{formatTime(currentSet.restTime)}</Text>
               </View>
             )}
           </View>
+
+          {/* Input de peso usado */}
+          <TouchableOpacity
+            onPress={() => setWeightModalVisible(true)}
+            style={styles.weightInputButton}
+            activeOpacity={0.7}
+          >
+            <View style={styles.weightInputContent}>
+              <Ionicons name="barbell" size={20} color={theme.primary.main} />
+              <Text style={styles.weightInputLabel}>Peso usado:</Text>
+              <Text style={styles.weightInputValue}>
+                {displayWeight} kg
+              </Text>
+              <Ionicons name="pencil" size={16} color={theme.text.tertiary} />
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Contador de descanso */}
         {isResting && (
-          <View className="bg-blue-50 rounded-2xl p-6 mb-4 border-2 border-blue-200">
-            <Text className="text-center text-gray-600 mb-2">Descanso</Text>
-            <Text className="text-center text-5xl font-bold text-blue-600 mb-4">
-              {formatTime(restTime)}
-            </Text>
+          <View style={styles.restCard}>
+            <Text style={styles.restTitle}>Descanso</Text>
+            <Text style={styles.restTime}>{formatTime(restTime)}</Text>
             <TouchableOpacity
               onPress={skipRest}
-              className="bg-blue-600 rounded-xl py-3 items-center"
+              style={styles.skipRestButton}
               activeOpacity={0.8}
             >
-              <Text className="text-white font-bold">Saltar Descanso</Text>
+              <Text style={styles.skipRestButtonText}>Saltar Descanso</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Botones de acción */}
+        {/* Botón completar serie */}
         {!isResting && (
-          <View className="space-y-3">
-            <TouchableOpacity
-              onPress={completeSet}
-              className="bg-green-600 rounded-xl py-4 items-center"
-              activeOpacity={0.8}
+          <TouchableOpacity
+            onPress={completeSet}
+            style={styles.completeButton}
+            activeOpacity={0.8}
+            disabled={saving}
+          >
+            <LinearGradient
+              colors={theme.gradients.primary}
+              style={styles.completeButtonGradient}
             >
-              <Text className="text-white font-bold text-lg">
-                Completar Serie
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setCommentModalVisible(true)}
-              className="bg-gray-200 rounded-xl py-4 items-center"
-              activeOpacity={0.8}
-            >
-              <Text className="text-gray-700 font-semibold">
-                💬 Agregar Comentario
-              </Text>
-            </TouchableOpacity>
-          </View>
+              <Ionicons name="checkmark-circle" size={24} color={theme.text.white} />
+              <Text style={styles.completeButtonText}>Completar Serie</Text>
+            </LinearGradient>
+          </TouchableOpacity>
         )}
+
+        {/* Botón cambiar ejercicio */}
+        <TouchableOpacity
+          onPress={() => {
+            setSelectedExercise(null);
+            setCurrentSetIndex(0);
+            setWeightUsed('');
+          }}
+          style={styles.changeExerciseButton}
+        >
+          <Text style={styles.changeExerciseButtonText}>Cambiar Ejercicio</Text>
+        </TouchableOpacity>
       </ScrollView>
 
-      {/* Modal de comentario */}
+      {/* Modal de peso usado */}
       <Modal
-        visible={commentModalVisible}
+        visible={weightModalVisible}
         animationType="slide"
         transparent
-        onRequestClose={() => setCommentModalVisible(false)}
+        onRequestClose={() => setWeightModalVisible(false)}
       >
-        <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-white rounded-t-3xl p-6">
-            <Text className="text-xl font-bold text-gray-800 mb-4">
-              Agregar Comentario
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Peso Usado</Text>
+            <Text style={styles.modalSubtitle}>
+              {plannedWeight && `Planificado: ${plannedWeight} kg`}
             </Text>
             <TextInput
-              value={comment}
-              onChangeText={setComment}
-              placeholder="Escribe tu comentario..."
-              placeholderTextColor="#9CA3AF"
-              multiline
-              numberOfLines={4}
-              className="bg-gray-100 rounded-xl px-4 py-3 text-gray-800 mb-4"
+              value={weightUsed}
+              onChangeText={setWeightUsed}
+              placeholder="0"
+              keyboardType="numeric"
+              style={styles.modalInput}
+              autoFocus
             />
-            <View className="flex-row gap-3">
+            <View style={styles.modalButtons}>
               <TouchableOpacity
                 onPress={() => {
-                  setCommentModalVisible(false);
-                  setComment('');
+                  setWeightModalVisible(false);
+                  setWeightUsed('');
                 }}
-                className="flex-1 bg-gray-200 rounded-xl py-3 items-center"
+                style={styles.modalCancelButton}
               >
-                <Text className="text-gray-700 font-semibold">Cancelar</Text>
+                <Text style={styles.modalCancelButtonText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={addComment}
-                className="flex-1 bg-blue-600 rounded-xl py-3 items-center"
+                onPress={() => setWeightModalVisible(false)}
+                style={styles.modalConfirmButton}
+                activeOpacity={0.8}
               >
-                <Text className="text-white font-semibold">Enviar</Text>
+                <LinearGradient
+                  colors={theme.gradients.primary}
+                  style={styles.modalConfirmButtonGradient}
+                >
+                  <Text style={styles.modalConfirmButtonText}>Confirmar</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
+
+      <Loading visible={saving || loadingMax} message={saving ? "Guardando..." : "Cargando datos..."} />
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={() => setToast({ ...toast, visible: false })}
+      />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.background.primary,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: theme.spacing.xl,
+  },
+  errorContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing.xl,
+  },
+  errorText: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+  },
+  sectionTitle: {
+    ...theme.typography.h2,
+    color: theme.text.primary,
+    marginBottom: theme.spacing.sm,
+  },
+  sectionSubtitle: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+    marginBottom: theme.spacing.xl,
+  },
+  dayCard: {
+    backgroundColor: theme.background.secondary,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.xl,
+    marginBottom: theme.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: theme.shadow.color,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  dayCardContent: {
+    flex: 1,
+  },
+  dayCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xs,
+  },
+  dayCardNumber: {
+    ...theme.typography.h3,
+    color: theme.text.primary,
+    marginRight: theme.spacing.sm,
+  },
+  dayCardName: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+  },
+  dayCardExercises: {
+    ...theme.typography.caption,
+    color: theme.text.tertiary,
+  },
+  dayInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.xl,
+  },
+  dayInfoTitle: {
+    ...theme.typography.h2,
+    color: theme.text.primary,
+  },
+  changeDayButton: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    backgroundColor: theme.background.tertiary,
+    borderRadius: theme.borderRadius.md,
+  },
+  changeDayButtonText: {
+    ...theme.typography.caption,
+    color: theme.primary.main,
+    fontWeight: '600',
+  },
+  exerciseCard: {
+    backgroundColor: theme.background.secondary,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.xl,
+    marginBottom: theme.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: theme.shadow.color,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  exerciseCardCompleted: {
+    borderWidth: 2,
+    borderColor: theme.accent.success,
+  },
+  exerciseCardContent: {
+    flex: 1,
+  },
+  exerciseCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.xs,
+  },
+  exerciseCardName: {
+    ...theme.typography.h3,
+    color: theme.text.primary,
+    flex: 1,
+  },
+  checkBadge: {
+    marginLeft: theme.spacing.sm,
+  },
+  exerciseCardSets: {
+    ...theme.typography.caption,
+    color: theme.text.secondary,
+  },
+  finishButton: {
+    marginTop: theme.spacing.xl,
+    borderRadius: theme.borderRadius.xl,
+    overflow: 'hidden',
+  },
+  finishButtonGradient: {
+    padding: theme.spacing.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  finishButtonText: {
+    ...theme.typography.h3,
+    color: theme.text.white,
+    marginLeft: theme.spacing.sm,
+  },
+  setInfoCard: {
+    backgroundColor: theme.background.secondary,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.xl,
+    marginBottom: theme.spacing.lg,
+    shadowColor: theme.shadow.color,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  setInfoHeader: {
+    marginBottom: theme.spacing.lg,
+  },
+  setInfoTitle: {
+    ...theme.typography.h3,
+    color: theme.text.primary,
+    marginBottom: theme.spacing.md,
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: theme.background.tertiary,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: theme.primary.main,
+    borderRadius: 3,
+  },
+  setInfoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: theme.spacing.lg,
+  },
+  setInfoItem: {
+    width: '50%',
+    marginBottom: theme.spacing.md,
+  },
+  setInfoLabel: {
+    ...theme.typography.caption,
+    color: theme.text.secondary,
+    marginBottom: theme.spacing.xs,
+  },
+  setInfoValue: {
+    ...theme.typography.h3,
+    color: theme.text.primary,
+  },
+  weightInputButton: {
+    backgroundColor: theme.iconBackground.light,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: theme.primary.main,
+    borderStyle: 'dashed',
+  },
+  weightInputContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  weightInputLabel: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+    marginLeft: theme.spacing.sm,
+    flex: 1,
+  },
+  weightInputValue: {
+    ...theme.typography.h3,
+    color: theme.primary.main,
+    fontWeight: '700',
+    marginRight: theme.spacing.sm,
+  },
+  restCard: {
+    backgroundColor: theme.iconBackground.tertiary,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.xxxl,
+    alignItems: 'center',
+    marginBottom: theme.spacing.lg,
+    borderWidth: 2,
+    borderColor: theme.primary.main,
+  },
+  restTitle: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+    marginBottom: theme.spacing.md,
+  },
+  restTime: {
+    fontSize: 64,
+    fontWeight: '800',
+    color: theme.primary.main,
+    marginBottom: theme.spacing.xl,
+  },
+  skipRestButton: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.md,
+    backgroundColor: theme.background.secondary,
+    borderRadius: theme.borderRadius.lg,
+  },
+  skipRestButtonText: {
+    ...theme.typography.body,
+    color: theme.primary.main,
+    fontWeight: '600',
+  },
+  completeButton: {
+    marginBottom: theme.spacing.md,
+    borderRadius: theme.borderRadius.xl,
+    overflow: 'hidden',
+  },
+  completeButtonGradient: {
+    padding: theme.spacing.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  completeButtonText: {
+    ...theme.typography.h3,
+    color: theme.text.white,
+    marginLeft: theme.spacing.sm,
+  },
+  changeExerciseButton: {
+    padding: theme.spacing.lg,
+    alignItems: 'center',
+  },
+  changeExerciseButtonText: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: theme.background.secondary,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.xl,
+    width: '80%',
+  },
+  modalTitle: {
+    ...theme.typography.h2,
+    color: theme.text.primary,
+    marginBottom: theme.spacing.sm,
+  },
+  modalSubtitle: {
+    ...theme.typography.caption,
+    color: theme.text.secondary,
+    marginBottom: theme.spacing.lg,
+  },
+  modalInput: {
+    backgroundColor: theme.background.tertiary,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.lg,
+    ...theme.typography.h2,
+    color: theme.text.primary,
+    textAlign: 'center',
+    marginBottom: theme.spacing.xl,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+  },
+  modalCancelButton: {
+    flex: 1,
+    padding: theme.spacing.lg,
+    backgroundColor: theme.background.tertiary,
+    borderRadius: theme.borderRadius.lg,
+    alignItems: 'center',
+  },
+  modalCancelButtonText: {
+    ...theme.typography.body,
+    color: theme.text.secondary,
+    fontWeight: '600',
+  },
+  modalConfirmButton: {
+    flex: 2,
+    borderRadius: theme.borderRadius.lg,
+    overflow: 'hidden',
+  },
+  modalConfirmButtonGradient: {
+    padding: theme.spacing.lg,
+    alignItems: 'center',
+  },
+  modalConfirmButtonText: {
+    ...theme.typography.body,
+    color: theme.text.white,
+    fontWeight: '700',
+  },
+});

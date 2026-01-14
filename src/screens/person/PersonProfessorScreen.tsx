@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../config/theme';
 import LoadingScreen from '../../components/LoadingScreen';
+import PageHeader from '../../components/PageHeader';
 
 export default function PersonProfessorScreen() {
   const { user } = useAuth();
@@ -56,18 +57,19 @@ export default function PersonProfessorScreen() {
 
   if (!professor || !(user as any).professorId) {
     return (
-      <ScrollView
-        style={{ flex: 1, backgroundColor: theme.background.primary }}
-        contentContainerStyle={{
-          flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: theme.spacing.xl,
-        }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.primary.main} />
-        }
-      >
+      <View style={{ flex: 1, backgroundColor: theme.background.primary }}>
+        <PageHeader icon="school-outline" />
+        <ScrollView
+          contentContainerStyle={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: theme.spacing.xl,
+          }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.primary.main} />
+          }
+        >
         <View style={{
           backgroundColor: theme.background.secondary,
           borderRadius: theme.borderRadius.xl,
@@ -108,17 +110,19 @@ export default function PersonProfessorScreen() {
           </Text>
         </View>
       </ScrollView>
+      </View>
     );
   }
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: theme.background.primary }}
-      contentContainerStyle={{ padding: theme.spacing.xl }}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.primary.main} />
-      }
-    >
+    <View style={{ flex: 1, backgroundColor: theme.background.primary }}>
+      <PageHeader icon="school-outline" />
+      <ScrollView
+        contentContainerStyle={{ padding: theme.spacing.xl }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.primary.main} />
+        }
+      >
       {/* Card del profesor */}
       <View style={{
         backgroundColor: theme.background.secondary,
@@ -286,5 +290,6 @@ export default function PersonProfessorScreen() {
         </View>
       </View>
     </ScrollView>
+    </View>
   );
 }

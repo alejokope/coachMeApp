@@ -149,3 +149,38 @@ export interface Message {
   createdAt: Date;
   read: boolean;
 }
+
+// Registro de una serie completada en un entrenamiento
+export interface WorkoutSetRecord {
+  setId: string; // ID de la serie original
+  exerciseId: string;
+  repetitions?: number;
+  weight?: number; // Peso usado (puede diferir del planificado)
+  completed: boolean;
+  completedAt: Date;
+  notes?: string;
+}
+
+// Registro de un ejercicio completado en un entrenamiento
+export interface WorkoutExerciseRecord {
+  exerciseId: string;
+  exerciseName: string;
+  sets: WorkoutSetRecord[];
+  completed: boolean;
+  completedAt?: Date;
+}
+
+// Sesión de entrenamiento (historial)
+export interface WorkoutSession {
+  id: string;
+  userId: string;
+  routineId: string;
+  routineName: string;
+  dayNumber: number;
+  dayName?: string;
+  exercises: WorkoutExerciseRecord[];
+  startTime: Date;
+  endTime?: Date;
+  completed: boolean;
+  notes?: string;
+}
