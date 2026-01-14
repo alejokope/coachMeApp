@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
-  Alert,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
@@ -18,10 +17,13 @@ import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../config/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Toast from '../../components/Toast';
 import LoadingScreen from '../../components/LoadingScreen';
 
 export default function PersonalMaxScreen() {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [personalMaxs, setPersonalMaxs] = useState<PersonalMax[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +51,7 @@ export default function PersonalMaxScreen() {
         setPersonalMaxs(maxs);
       }
     } catch (error) {
-      Alert.alert('Error', 'No se pudieron cargar los datos');
+      showToast('No se pudieron cargar los datos', 'error');
     } finally {
       setLoading(false);
     }
@@ -73,7 +75,7 @@ export default function PersonalMaxScreen() {
 
   const handleSave = async () => {
     if (!selectedExercise || !maxWeight.trim() || !user?.id) {
-      Alert.alert('Error', 'El peso máximo es obligatorio');
+      showToast('El peso máximo es obligatorio', 'error');
       return;
     }
 
@@ -87,9 +89,10 @@ export default function PersonalMaxScreen() {
       });
       setModalVisible(false);
       await loadData();
-      Alert.alert('Éxito', 'Máximo personal guardado');
+      showToast('Máximo personal guardado', 'success');
+      setModalVisible(false);
     } catch (error) {
-      Alert.alert('Error', 'No se pudo guardar el máximo');
+      showToast('No se pudo guardar el máximo', 'error');
     } finally {
       setSaving(false);
     }
@@ -237,9 +240,10 @@ export default function PersonalMaxScreen() {
         animationType="slide"
         transparent
         onRequestClose={() => !saving && setModalVisible(false)}
+        statusBarTranslucent
       >
         <View className="flex-1 bg-black/60 justify-end">
-          <View className="bg-white rounded-t-3xl p-6">
+          <View className="bg-white rounded-t-3xl p-6" style={{ paddingBottom: Math.max(insets.bottom, 24) }}>
             <View className="flex-row justify-between items-center mb-6">
               <View>
                 <Text className="text-2xl font-bold text-gray-800">

@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   Modal,
   ActivityIndicator,
   StyleSheet,
@@ -19,12 +18,15 @@ import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../config/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Toast from '../../components/Toast';
 
 type Step = 'name' | 'days' | 'exercises' | 'sets';
 
 export default function CreateRoutineScreen() {
   const navigation = useNavigation();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   
   // Paso actual
   const [currentStep, setCurrentStep] = useState<Step>('name');
@@ -52,6 +54,15 @@ export default function CreateRoutineScreen() {
   // Estados generales
   const [saving, setSaving] = useState(false);
   const [exerciseModalVisible, setExerciseModalVisible] = useState(false);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type?: 'success' | 'error' | 'info' }>({
+    visible: false,
+    message: '',
+    type: 'info',
+  });
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ visible: true, message, type });
+  };
 
   useEffect(() => {
     loadExercises();
@@ -76,7 +87,7 @@ export default function CreateRoutineScreen() {
       setExercises(data);
       setFilteredExercises(data);
     } catch (error) {
-      Alert.alert('Error', 'No se pudieron cargar los ejercicios');
+      showToast('No se pudieron cargar los ejercicios', 'error');
     } finally {
       setLoadingExercises(false);
     }
@@ -85,7 +96,7 @@ export default function CreateRoutineScreen() {
   // ========== PASO 1: NOMBRE Y DESCRIPCIÓN ==========
   const handleNameStepNext = () => {
     if (!routineName.trim()) {
-      Alert.alert('Error', 'El nombre de la rutina es obligatorio');
+      showToast('El nombre de la rutina es obligatorio', 'error');
       return;
     }
     setCurrentStep('days');
@@ -94,7 +105,7 @@ export default function CreateRoutineScreen() {
   // ========== PASO 2: AGREGAR DÍAS ==========
   const addDay = () => {
     if (!newDayName.trim()) {
-      Alert.alert('Error', 'Ingresa un nombre para el día');
+      showToast('Ingresa un nombre para el día', 'error');
       return;
     }
     
@@ -114,7 +125,7 @@ export default function CreateRoutineScreen() {
 
   const handleDaysStepNext = () => {
     if (days.length === 0) {
-      Alert.alert('Error', 'Debes agregar al menos un día');
+      showToast('Debes agregar al menos un día', 'error');
       return;
     }
     // Ir al primer día para agregar ejercicios
@@ -147,7 +158,7 @@ export default function CreateRoutineScreen() {
     if (currentDayIndex === null) return;
     
     if (days[currentDayIndex].exercises.length === 0) {
-      Alert.alert('Error', 'Debes agregar al menos un ejercicio a este día');
+      showToast('Debes agregar al menos un ejercicio a este día', 'error');
       return;
     }
     
@@ -188,7 +199,7 @@ export default function CreateRoutineScreen() {
 
   const handleSetStepNext = () => {
     if (sets.length === 0) {
-      Alert.alert('Error', 'Debes agregar al menos una serie');
+      showToast('Debes agregar al menos una serie', 'error');
       return;
     }
     
@@ -242,11 +253,10 @@ export default function CreateRoutineScreen() {
       
       await routineService.createRoutine(routineData);
 
-      Alert.alert('Éxito', 'Rutina creada correctamente', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      showToast('Rutina creada correctamente', 'success');
+      setTimeout(() => navigation.goBack(), 1500);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'No se pudo crear la rutina');
+      showToast(error.message || 'No se pudo crear la rutina', 'error');
     } finally {
       setSaving(false);
     }
@@ -482,8 +492,9 @@ export default function CreateRoutineScreen() {
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => setExerciseModalVisible(false)}
+        statusBarTranslucent
       >
-        <View style={styles.modalContainer}>
+        <View style={[styles.modalContainer, { paddingBottom: Math.max(insets.bottom, theme.spacing.xl) }]}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{selectedExercise.name}</Text>
             <TouchableOpacity
@@ -551,6 +562,18 @@ export default function CreateRoutineScreen() {
                       style={styles.setTextInput}
                     />
                   </View>
+                  <View style={styles.setInput}>
+                    <Text style={styles.setLabel}>RIR (Opcional)</Text>
+                    <TextInput
+                      value={set.rir?.toString() || ''}
+                      onChangeText={(text) =>
+                        updateSet(set.id, 'rir', text ? parseInt(text) : undefined)
+                      }
+                      keyboardType="numeric"
+                      placeholder="2"
+                      style={styles.setTextInput}
+                    />
+                  </View>
                 </View>
               </View>
             ))}
@@ -596,8 +619,9 @@ export default function CreateRoutineScreen() {
       animationType="slide"
       presentationStyle="pageSheet"
       onRequestClose={() => setExerciseModalVisible(false)}
+      statusBarTranslucent
     >
-      <View style={styles.modalContainer}>
+      <View style={[styles.modalContainer, { paddingBottom: Math.max(insets.bottom, theme.spacing.xl) }]}>
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Seleccionar Ejercicio</Text>
           <TouchableOpacity
@@ -661,6 +685,12 @@ export default function CreateRoutineScreen() {
 
       {renderExerciseSelectionModal()}
       {renderSetsModal()}
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={() => setToast({ ...toast, visible: false })}
+      />
     </View>
   );
 }

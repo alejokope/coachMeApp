@@ -1,9 +1,11 @@
-// Pantalla de bienvenida mejorada - Selección de tipo de usuario
+// Pantalla de bienvenida - Diseño profesional y moderno
 import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Animated, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, StyleSheet, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { theme } from '../config/theme';
 
 type RootStackParamList = {
   Welcome: undefined;
@@ -20,9 +22,7 @@ const { width } = Dimensions.get('window');
 export default function WelcomeScreen() {
   const navigation = useNavigation<WelcomeScreenNavigationProp>();
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
-  const gymScale = useRef(new Animated.Value(1)).current;
-  const personScale = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -39,152 +39,172 @@ export default function WelcomeScreen() {
     ]).start();
   }, []);
 
-  const handlePress = (userType: 'gym' | 'person', scale: Animated.Value) => {
-    Animated.sequence([
-      Animated.timing(scale, {
-        toValue: 0.95,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scale, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      navigation.navigate('Auth', { userType });
-    });
+  const handlePress = (userType: 'gym' | 'person') => {
+    navigation.navigate('Auth', { userType });
   };
 
   return (
-    <View className="flex-1">
+    <View style={styles.container}>
       <LinearGradient
-        colors={['#667eea', '#764ba2', '#f093fb']}
+        colors={theme.gradients.header}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        className="flex-1"
+        style={styles.gradient}
       >
-        <View className="flex-1 items-center justify-center px-6">
-          <Animated.View
-            style={{
+        <Animated.View
+          style={[
+            styles.content,
+            {
               opacity: fadeAnim,
               transform: [{ translateY: slideAnim }],
-            }}
-            className="items-center mb-12"
-          >
-            <View className="bg-white/20 rounded-3xl p-6 mb-6" style={{ borderRadius: 30 }}>
-              <Text className="text-6xl">💪</Text>
-            </View>
-            <Text className="text-5xl font-bold text-white mb-3 text-center">
-              CoachMe
-            </Text>
-            <Text className="text-xl text-white/90 text-center font-medium">
-              Tu entrenador personal en el bolsillo
-            </Text>
-          </Animated.View>
+            },
+          ]}
+        >
+          {/* Logo/Icono */}
+          <View style={styles.logoContainer}>
+            <LinearGradient
+              colors={theme.gradients.primary}
+              style={styles.logoCircle}
+            >
+              <Ionicons name="barbell" size={48} color={theme.text.white} />
+            </LinearGradient>
+            <Text style={styles.appName}>CoachMe</Text>
+            <Text style={styles.tagline}>Tu entrenador personal</Text>
+          </View>
 
-          <Animated.View
-            style={{
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            }}
-            className="w-full"
-          >
-            <Text className="text-white/80 text-lg mb-8 text-center font-semibold">
-              ¿Cómo quieres usar la app?
-            </Text>
-
-            <Animated.View style={{ transform: [{ scale: gymScale }] }}>
-              <TouchableOpacity
-                onPress={() => handlePress('gym', gymScale)}
-                activeOpacity={0.9}
-                className="mb-6"
+          {/* Opciones */}
+          <View style={styles.optionsContainer}>
+            <TouchableOpacity
+              onPress={() => handlePress('gym')}
+              style={styles.optionCard}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={theme.gradients.primary}
+                style={styles.optionIconContainer}
               >
-                <View className="absolute top-2 right-2 bg-blue-600 rounded-full px-2 py-1">
-                  <Text className="text-white text-xs font-semibold">Solo Login</Text>
-                </View>
-                <View
-                  className="bg-white rounded-3xl p-6 shadow-2xl"
-                  style={{
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 10 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 20,
-                    elevation: 10,
-                  }}
-                >
-                  <View className="flex-row items-center mb-4">
-                    <View className="bg-blue-100 rounded-2xl p-4 mr-4">
-                      <Text className="text-4xl">🏋️</Text>
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-2xl font-bold text-gray-800 mb-1">
-                        Soy un Gimnasio
-                      </Text>
-                      <Text className="text-gray-600 text-sm">
-                        Gestiona usuarios, profesores y rutinas
-                      </Text>
-                    </View>
-                  </View>
-                  <View className="flex-row items-center">
-                    <View className="flex-1 h-1 bg-gray-200 rounded-full mr-2">
-                      <View className="h-full bg-blue-600 rounded-full" style={{ width: '60%' }} />
-                    </View>
-                    <Text className="text-blue-600 font-semibold text-sm">Gym</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            </Animated.View>
+                <Ionicons name="business" size={32} color={theme.text.white} />
+              </LinearGradient>
+              <View style={styles.optionContent}>
+                <Text style={styles.optionTitle}>Soy un Gimnasio</Text>
+                <Text style={styles.optionDescription}>
+                  Gestiona usuarios, profesores y rutinas
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color={theme.text.tertiary} />
+            </TouchableOpacity>
 
-            <Animated.View style={{ transform: [{ scale: personScale }] }}>
-              <TouchableOpacity
-                onPress={() => handlePress('person', personScale)}
-                activeOpacity={0.9}
+            <TouchableOpacity
+              onPress={() => handlePress('person')}
+              style={styles.optionCard}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={theme.gradients.secondary}
+                style={styles.optionIconContainer}
               >
-                <View
-                  className="bg-white rounded-3xl p-6 shadow-2xl"
-                  style={{
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 10 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 20,
-                    elevation: 10,
-                  }}
-                >
-                  <View className="flex-row items-center mb-4">
-                    <View className="bg-pink-100 rounded-2xl p-4 mr-4">
-                      <Text className="text-4xl">👤</Text>
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-2xl font-bold text-gray-800 mb-1">
-                        Soy una Persona
-                      </Text>
-                      <Text className="text-gray-600 text-sm">
-                        Crea y sigue tus rutinas personales
-                      </Text>
-                    </View>
-                  </View>
-                  <View className="flex-row items-center">
-                    <View className="flex-1 h-1 bg-gray-200 rounded-full mr-2">
-                      <View className="h-full bg-pink-600 rounded-full" style={{ width: '60%' }} />
-                    </View>
-                    <Text className="text-pink-600 font-semibold text-sm">Personal</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            </Animated.View>
-          </Animated.View>
+                <Ionicons name="person" size={32} color={theme.text.white} />
+              </LinearGradient>
+              <View style={styles.optionContent}>
+                <Text style={styles.optionTitle}>Soy una Persona</Text>
+                <Text style={styles.optionDescription}>
+                  Crea y sigue tus rutinas personales
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color={theme.text.tertiary} />
+            </TouchableOpacity>
+          </View>
 
-          <Animated.View
-            style={{ opacity: fadeAnim }}
-            className="mt-8"
-          >
-            <Text className="text-white/60 text-xs text-center">
-              Versión 1.0.0
-            </Text>
-          </Animated.View>
-        </View>
+          {/* Footer */}
+          <Text style={styles.version}>Versión 1.0.0</Text>
+        </Animated.View>
       </LinearGradient>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  gradient: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.xxxl,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: theme.spacing.xxxl * 2,
+  },
+  logoCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: theme.spacing.xl,
+    shadowColor: theme.shadow.color,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  appName: {
+    ...theme.typography.h1,
+    color: theme.text.white,
+    marginBottom: theme.spacing.sm,
+  },
+  tagline: {
+    ...theme.typography.body,
+    color: theme.text.whiteAlpha[90],
+    fontSize: 18,
+  },
+  optionsContainer: {
+    width: '100%',
+    maxWidth: 400,
+    gap: theme.spacing.lg,
+  },
+  optionCard: {
+    backgroundColor: theme.background.secondary,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: theme.shadow.color,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  optionIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: theme.borderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: theme.spacing.lg,
+  },
+  optionContent: {
+    flex: 1,
+  },
+  optionTitle: {
+    ...theme.typography.h3,
+    color: theme.text.primary,
+    marginBottom: theme.spacing.xs,
+  },
+  optionDescription: {
+    ...theme.typography.caption,
+    color: theme.text.secondary,
+    fontSize: 13,
+  },
+  version: {
+    ...theme.typography.caption,
+    color: theme.text.whiteAlpha[60],
+    marginTop: theme.spacing.xxxl,
+  },
+});

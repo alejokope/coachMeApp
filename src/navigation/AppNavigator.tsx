@@ -1,9 +1,9 @@
 // Navegación principal de la aplicación
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
-import { ActivityIndicator, View } from 'react-native';
+import SplashScreen from '../components/SplashScreen';
 
 // Screens
 import WelcomeScreen from '../screens/WelcomeScreen';
@@ -20,13 +20,18 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function AppNavigator() {
   const { user, loading } = useAuth();
+  const [showSplash, setShowSplash] = useState(true);
 
-  if (loading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-blue-600">
-        <ActivityIndicator size="large" color="#FFFFFF" />
-      </View>
-    );
+  useEffect(() => {
+    // Si ya terminó de cargar, esperar un poco más para mostrar el splash
+    if (!loading) {
+      // El splash se oculta automáticamente después de su animación
+    }
+  }, [loading]);
+
+  // Mostrar splash mientras carga o durante la animación
+  if (showSplash) {
+    return <SplashScreen onFinish={() => setShowSplash(false)} />;
   }
 
   return (

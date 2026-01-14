@@ -27,6 +27,7 @@ import { theme } from '../../config/theme';
 import Toast from '../../components/Toast';
 import Loading from '../../components/Loading';
 import LoadingScreen from '../../components/LoadingScreen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type StudentStackParamList = {
   StudentHome: undefined;
@@ -57,6 +58,7 @@ export default function WorkoutScreen() {
   const navigation = useNavigation<WorkoutScreenNavigationProp>();
   const { user } = useAuth();
   const { routineId, isPersonal } = route.params;
+  const insets = useSafeAreaInsets();
 
   // Estados principales
   const [routine, setRoutine] = useState<any>(null);
@@ -72,6 +74,8 @@ export default function WorkoutScreen() {
   const [isResting, setIsResting] = useState(false);
   const restTimerRef = useRef<NodeJS.Timeout | null>(null);
   const notificationIdRef = useRef<string | null>(null);
+  const restStartTimeRef = useRef<number | null>(null);
+  const restDurationRef = useRef<number>(0);
   
   // Peso máximo y datos del ejercicio
   const [personalMax, setPersonalMax] = useState<number | null>(null);
@@ -98,10 +102,40 @@ export default function WorkoutScreen() {
     loadRoutine();
     requestNotificationPermissions();
     
+    // Listener para cuando se recibe una notificación (incluso en background)
+    const notificationListener = Notifications.addNotificationReceivedListener((notification) => {
+      if (notification.request.content.data?.type === 'rest_finished' && isResting) {
+        // El descanso terminó mientras estaba en background
+        setIsResting(false);
+        setRestTime(0);
+        restStartTimeRef.current = null;
+        if (restTimerRef.current) {
+          clearInterval(restTimerRef.current);
+          restTimerRef.current = null;
+        }
+        showToast('¡Descanso terminado!', 'success');
+      }
+    });
+    
+    // Listener para cuando se toca una notificación
+    const responseListener = Notifications.addNotificationResponseReceivedListener((response) => {
+      if (response.notification.request.content.data?.type === 'rest_finished' && isResting) {
+        setIsResting(false);
+        setRestTime(0);
+        restStartTimeRef.current = null;
+        if (restTimerRef.current) {
+          clearInterval(restTimerRef.current);
+          restTimerRef.current = null;
+        }
+      }
+    });
+    
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     
     return () => {
       subscription.remove();
+      notificationListener.remove();
+      responseListener.remove();
       if (restTimerRef.current) {
         clearInterval(restTimerRef.current);
       }
@@ -113,7 +147,7 @@ export default function WorkoutScreen() {
         }
       }
     };
-  }, []);
+  }, [isResting]);
 
   useEffect(() => {
     if (selectedExercise?.exerciseId && user?.id) {
@@ -131,27 +165,110 @@ export default function WorkoutScreen() {
   };
 
   const handleAppStateChange = (nextAppState: AppStateStatus) => {
-    if (nextAppState === 'background' && isResting) {
-      scheduleRestNotification();
+    if (nextAppState === 'background' && isResting && restStartTimeRef.current) {
+      // Cuando va al background:
+      // 1. Cancelar el timer de JavaScript (no funciona en background)
+      if (restTimerRef.current) {
+        clearInterval(restTimerRef.current);
+        restTimerRef.current = null;
+      }
+      
+      // 2. Calcular tiempo restante
+      const elapsed = Math.floor((Date.now() - restStartTimeRef.current) / 1000);
+      const remaining = Math.max(0, restDurationRef.current - elapsed);
+      
+      // 3. Programar notificación para cuando termine el descanso
+      if (remaining > 0) {
+        scheduleRestNotification(remaining);
+      }
+    } else if (nextAppState === 'active' && isResting && restStartTimeRef.current) {
+      // Cuando vuelve al foreground, recalcular el tiempo restante
+      const elapsed = Math.floor((Date.now() - restStartTimeRef.current) / 1000);
+      const remaining = Math.max(0, restDurationRef.current - elapsed);
+      
+      // Cancelar notificación programada si existe
+      if (notificationIdRef.current) {
+        try {
+          Notifications.cancelScheduledNotificationAsync(notificationIdRef.current);
+          notificationIdRef.current = null;
+        } catch (error) {
+          // Ignorar
+        }
+      }
+      
+      if (remaining <= 0) {
+        // El descanso ya terminó
+        setIsResting(false);
+        setRestTime(0);
+        restStartTimeRef.current = null;
+        showToast('¡Descanso terminado!', 'success');
+      } else {
+        // Actualizar el tiempo restante y reiniciar el timer
+        setRestTime(remaining);
+        // Reiniciar el timer de JavaScript
+        if (restTimerRef.current) {
+          clearInterval(restTimerRef.current);
+        }
+        restTimerRef.current = setInterval(() => {
+          if (restStartTimeRef.current) {
+            const elapsed = Math.floor((Date.now() - restStartTimeRef.current) / 1000);
+            const remaining = Math.max(0, restDurationRef.current - elapsed);
+            
+            if (remaining <= 0) {
+              clearInterval(restTimerRef.current!);
+              setIsResting(false);
+              restStartTimeRef.current = null;
+              try {
+                Notifications.scheduleNotificationAsync({
+                  content: {
+                    title: '¡Descanso terminado!',
+                    body: 'Ya puedes continuar con tu siguiente serie',
+                    sound: true,
+                  },
+                  trigger: null,
+                });
+              } catch (error) {
+                // Ignorar
+              }
+              showToast('¡Descanso terminado!', 'success');
+              setRestTime(0);
+            } else {
+              setRestTime(remaining);
+            }
+          }
+        }, 1000);
+      }
     }
   };
 
-  const scheduleRestNotification = async () => {
-    if (restTime > 0) {
+  const scheduleRestNotification = async (seconds?: number) => {
+    const timeToWait = seconds !== undefined ? seconds : restTime;
+    if (timeToWait > 0) {
       try {
+        // Cancelar notificación anterior si existe
+        if (notificationIdRef.current) {
+          try {
+            await Notifications.cancelScheduledNotificationAsync(notificationIdRef.current);
+          } catch (error) {
+            // Ignorar
+          }
+        }
+        
         const notificationId = await Notifications.scheduleNotificationAsync({
           content: {
             title: '¡Descanso terminado!',
             body: 'Ya puedes continuar con tu siguiente serie',
             sound: true,
+            data: { type: 'rest_finished' },
           },
           trigger: {
-            seconds: restTime,
+            seconds: timeToWait,
           },
         });
         notificationIdRef.current = notificationId;
+        console.log(`Notificación programada para ${timeToWait} segundos`);
       } catch (error) {
-        console.log('Notificación local no disponible');
+        console.log('Error programando notificación:', error);
       }
     }
   };
@@ -320,6 +437,9 @@ export default function WorkoutScreen() {
   };
 
   const startRest = (seconds: number) => {
+    // Guardar timestamp de inicio y duración total
+    restStartTimeRef.current = Date.now();
+    restDurationRef.current = seconds;
     setRestTime(seconds);
     setIsResting(true);
 
@@ -333,11 +453,21 @@ export default function WorkoutScreen() {
 
     scheduleRestNotification();
 
+    // Limpiar timer anterior si existe
+    if (restTimerRef.current) {
+      clearInterval(restTimerRef.current);
+    }
+
     restTimerRef.current = setInterval(() => {
-      setRestTime((prev) => {
-        if (prev <= 1) {
+      if (restStartTimeRef.current) {
+        // Calcular tiempo transcurrido desde el inicio
+        const elapsed = Math.floor((Date.now() - restStartTimeRef.current) / 1000);
+        const remaining = Math.max(0, restDurationRef.current - elapsed);
+        
+        if (remaining <= 0) {
           clearInterval(restTimerRef.current!);
           setIsResting(false);
+          restStartTimeRef.current = null;
           try {
             Notifications.scheduleNotificationAsync({
               content: {
@@ -351,24 +481,51 @@ export default function WorkoutScreen() {
             // Ignorar
           }
           showToast('¡Descanso terminado!', 'success');
-          return 0;
+          setRestTime(0);
+        } else {
+          setRestTime(remaining);
         }
-        return prev - 1;
-      });
+      } else {
+        // Fallback al método anterior si no hay timestamp
+        setRestTime((prev) => {
+          if (prev <= 1) {
+            clearInterval(restTimerRef.current!);
+            setIsResting(false);
+            try {
+              Notifications.scheduleNotificationAsync({
+                content: {
+                  title: '¡Descanso terminado!',
+                  body: 'Ya puedes continuar con tu siguiente serie',
+                  sound: true,
+                },
+                trigger: null,
+              });
+            } catch (error) {
+              // Ignorar
+            }
+            showToast('¡Descanso terminado!', 'success');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }
     }, 1000);
   };
 
   const skipRest = () => {
     if (restTimerRef.current) {
       clearInterval(restTimerRef.current);
+      restTimerRef.current = null;
     }
     if (notificationIdRef.current) {
       try {
         Notifications.cancelScheduledNotificationAsync(notificationIdRef.current);
+        notificationIdRef.current = null;
       } catch (error) {
         // Ignorar
       }
     }
+    restStartTimeRef.current = null;
     setIsResting(false);
     setRestTime(0);
     showToast('Descanso saltado', 'info');
@@ -672,9 +829,10 @@ export default function WorkoutScreen() {
         animationType="slide"
         transparent
         onRequestClose={() => setWeightModalVisible(false)}
+        statusBarTranslucent
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, theme.spacing.xl) }]}>
             <Text style={styles.modalTitle}>Peso Usado</Text>
             <Text style={styles.modalSubtitle}>
               {plannedWeight && `Planificado: ${plannedWeight} kg`}
