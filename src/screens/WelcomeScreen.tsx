@@ -1,6 +1,6 @@
-// Pantalla de bienvenida - Diseño profesional y moderno
-import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Animated, StyleSheet, Dimensions } from 'react-native';
+// Pantalla de bienvenida - Diseño moderno con gradiente púrpura
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,23 +21,6 @@ const { width } = Dimensions.get('window');
 
 export default function WelcomeScreen() {
   const navigation = useNavigation<WelcomeScreenNavigationProp>();
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
 
   const handlePress = (userType: 'gym' | 'person') => {
     navigation.navigate('Auth', { userType });
@@ -46,78 +29,81 @@ export default function WelcomeScreen() {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={theme.gradients.header}
+        colors={['#667eea', '#764ba2', '#667eea']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
       >
-        <Animated.View
-          style={[
-            styles.content,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
-        >
-          {/* Logo/Icono */}
+        {/* Formas circulares decorativas */}
+        <View style={styles.circle1} />
+        <View style={styles.circle2} />
+        <View style={styles.circle3} />
+
+        <View style={styles.content}>
+          {/* Logo */}
           <View style={styles.logoContainer}>
-            <LinearGradient
-              colors={theme.gradients.primary}
-              style={styles.logoCircle}
-            >
-              <Ionicons name="barbell" size={48} color={theme.text.white} />
-            </LinearGradient>
-            <Text style={styles.appName}>CoachMe</Text>
-            <Text style={styles.tagline}>Tu entrenador personal</Text>
+            <View style={styles.logoIcon}>
+              <Ionicons name="barbell" size={32} color="#667eea" />
+            </View>
           </View>
 
-          {/* Opciones */}
-          <View style={styles.optionsContainer}>
+          {/* Nombre de la app */}
+          <Text style={styles.appName}>CoachMe</Text>
+
+          {/* Tagline */}
+          <Text style={styles.tagline}>Tu entrenamiento personalizado</Text>
+
+          {/* Texto de bienvenida */}
+          <View style={styles.welcomeSection}>
+            <Text style={styles.welcomeTitle}>¡Bienvenido!</Text>
+            <Text style={styles.welcomeText}>
+              Únete a la comunidad de entrenamiento más completa. Crea, asigna y sigue rutinas de ejercicio con seguimiento profesional.
+            </Text>
+          </View>
+
+          {/* Cards de selección */}
+          <View style={styles.cardsContainer}>
+            {/* Card Gimnasio */}
             <TouchableOpacity
               onPress={() => handlePress('gym')}
-              style={styles.optionCard}
+              style={styles.card}
               activeOpacity={0.8}
             >
-              <LinearGradient
-                colors={theme.gradients.primary}
-                style={styles.optionIconContainer}
-              >
-                <Ionicons name="business" size={32} color={theme.text.white} />
-              </LinearGradient>
-              <View style={styles.optionContent}>
-                <Text style={styles.optionTitle}>Soy un Gimnasio</Text>
-                <Text style={styles.optionDescription}>
-                  Gestiona usuarios, profesores y rutinas
-                </Text>
+              <View style={styles.cardIconContainer}>
+                <Ionicons name="business" size={24} color="#667eea" />
               </View>
-              <Ionicons name="chevron-forward" size={24} color={theme.text.tertiary} />
+              <View style={styles.cardContent}>
+                <Text style={styles.cardTitle}>Soy un Gimnasio</Text>
+                <Text style={styles.cardDescription}>Gestiona usuarios y profesores</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
             </TouchableOpacity>
 
+            {/* Card Persona */}
             <TouchableOpacity
               onPress={() => handlePress('person')}
-              style={styles.optionCard}
+              style={styles.card}
               activeOpacity={0.8}
             >
-              <LinearGradient
-                colors={theme.gradients.secondary}
-                style={styles.optionIconContainer}
-              >
-                <Ionicons name="person" size={32} color={theme.text.white} />
-              </LinearGradient>
-              <View style={styles.optionContent}>
-                <Text style={styles.optionTitle}>Soy una Persona</Text>
-                <Text style={styles.optionDescription}>
-                  Crea y sigue tus rutinas personales
-                </Text>
+              <View style={[styles.cardIconContainer, { backgroundColor: '#E0F2FE' }]}>
+                <Ionicons name="person" size={24} color="#0EA5E9" />
               </View>
-              <Ionicons name="chevron-forward" size={24} color={theme.text.tertiary} />
+              <View style={styles.cardContent}>
+                <Text style={styles.cardTitle}>Soy una Persona</Text>
+                <Text style={styles.cardDescription}>Profesor o alumno individual</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
             </TouchableOpacity>
           </View>
 
-          {/* Footer */}
-          <Text style={styles.version}>Versión 1.0.0</Text>
-        </Animated.View>
+          {/* Link de login */}
+          <View style={styles.loginSection}>
+            <Text style={styles.loginText}>¿Ya tienes cuenta? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Auth', { userType: 'person' })}>
+              <Text style={styles.loginLink}>Iniciar sesión</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </LinearGradient>
     </View>
   );
@@ -130,81 +116,137 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
   },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.xl,
-    paddingVertical: theme.spacing.xxxl,
+  // Formas circulares decorativas
+  circle1: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    top: -50,
+    right: -50,
   },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: theme.spacing.xxxl * 2,
+  circle2: {
+    position: 'absolute',
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    top: 100,
+    left: -30,
   },
-  logoCircle: {
+  circle3: {
+    position: 'absolute',
     width: 120,
     height: 120,
     borderRadius: 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    bottom: 150,
+    right: 30,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 60,
+    paddingBottom: 100,
+  },
+  logoContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: theme.spacing.xl,
-    shadowColor: theme.shadow.color,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    marginBottom: 20,
   },
-  appName: {
-    ...theme.typography.h1,
-    color: theme.text.white,
-    marginBottom: theme.spacing.sm,
-  },
-  tagline: {
-    ...theme.typography.body,
-    color: theme.text.whiteAlpha[90],
-    fontSize: 18,
-  },
-  optionsContainer: {
-    width: '100%',
-    maxWidth: 400,
-    gap: theme.spacing.lg,
-  },
-  optionCard: {
-    backgroundColor: theme.background.secondary,
-    borderRadius: theme.borderRadius.xl,
-    padding: theme.spacing.xl,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: theme.shadow.color,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  optionIconContainer: {
+  logoIcon: {
     width: 64,
     height: 64,
-    borderRadius: theme.borderRadius.lg,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: theme.spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  optionContent: {
+  appName: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  tagline: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 40,
+    opacity: 0.95,
+  },
+  welcomeSection: {
+    marginBottom: 32,
+  },
+  welcomeTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 12,
+  },
+  welcomeText: {
+    fontSize: 15,
+    color: '#FFFFFF',
+    lineHeight: 22,
+    opacity: 0.9,
+  },
+  cardsContainer: {
+    gap: 16,
+    marginBottom: 32,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  cardIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#F3E8FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  cardContent: {
     flex: 1,
   },
-  optionTitle: {
-    ...theme.typography.h3,
-    color: theme.text.primary,
-    marginBottom: theme.spacing.xs,
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 4,
   },
-  optionDescription: {
-    ...theme.typography.caption,
-    color: theme.text.secondary,
-    fontSize: 13,
+  cardDescription: {
+    fontSize: 14,
+    color: '#6B7280',
   },
-  version: {
-    ...theme.typography.caption,
-    color: theme.text.whiteAlpha[60],
-    marginTop: theme.spacing.xxxl,
+  loginSection: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loginText: {
+    fontSize: 14,
+    color: '#D1D5DB',
+  },
+  loginLink: {
+    fontSize: 14,
+    color: '#667eea',
+    textDecorationLine: 'underline',
+    fontWeight: '600',
   },
 });
