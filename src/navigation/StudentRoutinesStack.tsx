@@ -29,8 +29,7 @@ export default function StudentRoutinesStack() {
         name="Workout"
         component={WorkoutScreen}
         options={{ 
-          headerShown: true,
-          header: () => <PageHeader title="Entrenamiento" icon="barbell-outline" />,
+          headerShown: false,
         }}
       />
       <Stack.Screen

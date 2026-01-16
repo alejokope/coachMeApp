@@ -16,12 +16,14 @@ export default function Loading({ visible, message, fullScreen = false }: Loadin
 
   const content = (
     <View style={styles.container}>
-      <LinearGradient
-        colors={theme.gradients.primary}
-        style={styles.iconContainer}
-      >
-        <Ionicons name="hourglass-outline" size={32} color={theme.text.white} />
-      </LinearGradient>
+      <View style={styles.iconContainer}>
+        <LinearGradient
+          colors={theme.gradients.primary}
+          style={styles.iconGradient}
+        >
+          <Ionicons name="hourglass-outline" size={32} color={theme.text.white} />
+        </LinearGradient>
+      </View>
       <ActivityIndicator size="large" color={theme.primary.main} style={styles.spinner} />
       {message && <Text style={styles.message}>{message}</Text>}
     </View>
@@ -51,14 +53,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(248, 250, 252, 0.8)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 9999,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(248, 250, 252, 0.95)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -69,19 +71,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 200,
-    shadowColor: theme.shadow.color,
+    shadowColor: theme.shadow.secondary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
     elevation: 8,
+    borderWidth: 1,
+    borderColor: theme.background.tertiary,
   },
   iconContainer: {
-    width: 64,
-    height: 64,
+    width: 80,
+    height: 80,
     borderRadius: theme.borderRadius.xl,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: theme.spacing.lg,
+    shadowColor: theme.shadow.secondary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  iconGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: theme.borderRadius.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   spinner: {
     marginBottom: theme.spacing.md,
@@ -91,5 +107,6 @@ const styles = StyleSheet.create({
     color: theme.text.primary,
     textAlign: 'center',
     marginTop: theme.spacing.sm,
+    fontWeight: '600',
   },
 });
